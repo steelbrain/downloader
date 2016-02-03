@@ -14,11 +14,6 @@ export function promisedRequest(options: Object): Promise{
   })
 }
 
-export const DOWNLOAD_STATUS = {
-  STARTED: 'STARTED',
-  RESUMED: 'RESUMED'
-}
-
 export const FS = {
   open: promisify(NativeFS.open),
   close: promisify(NativeFS.close),

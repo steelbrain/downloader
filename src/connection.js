@@ -6,24 +6,21 @@ import URL from 'url'
 import Path from 'path'
 import FS from 'fs'
 import {CompositeDisposable, Emitter, Disposable} from 'sb-event-kit'
-import {promisedRequest, DOWNLOAD_STATUS} from './helpers'
+import {promisedRequest} from './helpers'
+import type {PoolWorker} from 'range-pool'
 
 export class Connection {
   subscriptions: CompositeDisposable;
   emitter: Emitter;
   url: string;
-  startOffset: number;
-  currentOffset: number;
-  limitOffset: number;
   fileSize: number;
   response: Object;
+  worker: PoolWorker;
 
-  constructor(url: string, startOffset: number, limitOffset: number) {
+  constructor(url: string, worker: PoolWorker) {
     this.url = url
-    this.startOffset = startOffset
-    this.currentOffset = startOffset
-    this.limitOffset = limitOffset
-    this.fileSize = 0;
+    this.worker = worker
+    this.fileSize = 0
 
     this.subscriptions = new CompositeDisposable()
     this.emitter = new Emitter()
@@ -32,10 +29,10 @@ export class Connection {
   }
   async activate(): Promise {
     let range = null
-    if (this.startOffset !== 0) {
-      range = this.startOffset + '-'
-      if (this.limitOffset !== Infinity) {
-        range += this.limitOffset
+    if (this.worker.getCurrentIndex() !== 0) {
+      range = this.worker.getCurrentIndex() + '-'
+      if (this.worker.getIndexLimit() !== Infinity) {
+        range += this.worker.getIndexLimit()
       }
     }
 
@@ -51,21 +48,27 @@ export class Connection {
     this.response.on('close', () => this.emitter.emit('did-close'))
 
     this.fileSize = parseInt(this.response.headers['content-length']) || 0
-
-    return {
-      status: this.response.statusCode === 206 ? DOWNLOAD_STATUS.RESUMED : DOWNLOAD_STATUS.STARTED
-    }
+    return range === null || this.response.statusCode === 206
   }
   pipe(fd: number) {
     this.response.on('data', chunk => {
       const chunkLength = chunk.length
+      const remaining = this.worker.getRemaining()
+      const shouldClose = remaining <= chunkLength
 
-      FS.write(fd, chunk, 0, chunkLength, this.currentOffset, error => {
+      if (chunkLength > remaining) {
+        chunk = chunk.slice(0, remaining)
+      }
+      if (shouldClose) {
+        this.response.destroy()
+      }
+
+      FS.write(fd, chunk, 0, chunkLength, this.worker.getCurrentIndex(), error => {
         if (error) {
           this.emitter.emit('error', error)
         }
       })
-      this.currentOffset += chunk.length
+      this.worker.advance(chunk.length)
     })
   }
   onError(callback: Function): Disposable {
@@ -87,7 +90,7 @@ export class Connection {
   dispose() {
     this.subscriptions.dispose()
   }
-  static create(url: string, startOffset: number = 0, limitOffset: number = Infinity) {
-    return new Connection(url, startOffset, limitOffset)
+  static create(url: string, worker: PoolWorker) {
+    return new Connection(url, worker)
   }
 }

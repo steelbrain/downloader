@@ -4,6 +4,7 @@
 
 import Path from 'path'
 import {CompositeDisposable, Emitter, Disposable} from 'sb-event-kit'
+import {RangePool} from 'range-pool'
 import {Connection} from './connection'
 import {FS} from './helpers'
 import type {Downloader$Job} from './types'
@@ -16,6 +17,7 @@ export class Download {
   fileSize: number;
   multipleAllowed: boolean;
   fd: number;
+  rangePool: RangePool;
 
   constructor(options: Downloader$Job) {
     this.subscriptions = new CompositeDisposable()
@@ -25,11 +27,13 @@ export class Download {
     this.fileSize = Infinity
     this.multipleAllowed = true
     this.fd = 0
+    this.rangePool = new RangePool(Infinity)
 
     this.subscriptions.add(this.emitter)
   }
   async download(): Promise {
     const connection = await this.spawnConnection()
+    this.rangePool.length = connection.getFileSize()
     this.fileSize = connection.getFileSize()
     if (!this.options.target.file) {
       this.options.target.file = connection.getFileName()
@@ -49,12 +53,13 @@ export class Download {
     this.connections.forEach(connection => connection.dispose())
   }
   // Private method
-  async spawnConnection(startOffset: number = 0, limitOffset: number = Infinity): Promise<Connection> {
-    const connection = Connection.create(this.options.url, startOffset, limitOffset)
+  async spawnConnection(): Promise<Connection> {
+    const worker = this.rangePool.createWorker()
+    const connection = Connection.create(this.options.url, worker)
     connection.onDidClose(_ => {
-      // TODO: Mark this buffer range as advanced
+      worker.dispose()
       this.connections.delete(connection)
-      console.log('close')
+      console.log('closed')
     })
     connection.onError(function(error) {
       console.log(error.stack || error)
