@@ -58,7 +58,9 @@ export class Connection {
   }
   pipe(fd: number) {
     this.response.on('data', chunk => {
-      FS.write(fd, chunk.toString(), this.currentOffset, 'utf8', error => {
+      const chunkLength = chunk.length
+
+      FS.write(fd, chunk, 0, chunkLength, this.currentOffset, error => {
         if (error) {
           this.emitter.emit('error', error)
         }

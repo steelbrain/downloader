@@ -4,6 +4,9 @@
 
 export type Downloader$Job = {
   url: string,
-  downloadPath: string,
+  target: {
+    directory: string,
+    file?: ?string
+  },
   connections: number
 }
