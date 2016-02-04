@@ -16,6 +16,7 @@ export class Download {
   emitter: Emitter;
   connections: Set<Connection>;
   pool: RangePool;
+  lastPercentage: number;
 
   constructor(options: Downloader$Job) {
     this.subscriptions = new CompositeDisposable()
@@ -23,6 +24,7 @@ export class Download {
     this.connections = new Set()
     this.pool = new RangePool(1024 * 1024 * 1024)
     this.options = options
+    this.lastPercentage = -1
   }
   async start(): Promise {
     const connection = await this.getConnection().activate()
@@ -81,6 +83,16 @@ export class Download {
       this.emitter.emit('did-error', e)
       connection.dispose()
       this.handleConnection(fd, index, this.getConnection(), keepRunning)
+    })
+    connection.onDidProgress(_ => {
+      const percentage = Math.round((this.pool.getCompletedSteps() / this.pool.length) * 100)
+      if (percentage !== this.lastPercentage) {
+        this.lastPercentage = percentage
+        this.emitter.emit('did-progress', percentage)
+        if (percentage === 100) {
+          this.emitter.emit('did-complete')
+        }
+      }
     })
     await connection.activate()
     connection.start(fd)
