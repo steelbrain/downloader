@@ -27,7 +27,7 @@ if (parameters.v) {
     console.error('Download Error', error.stack || error)
   })
   download.onDidStart(function(info) {
-    console.log('Download started:', fileSize(info.fileSize), 'to', info.filePath)
+    console.log('Download started:', info.url, 'to', info.filePath, '(' + fileSize(info.fileSize) + ')')
   })
   download.onDidComplete(function() {
     console.log('Download completed!')
