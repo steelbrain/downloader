@@ -9,7 +9,6 @@ import {Emitter} from 'sb-event-kit'
 import {promisedRequest, getRange} from './helpers'
 import type {Disposable} from 'sb-event-kit'
 import type {RangePool, PoolWorker} from 'range-pool'
-import type {Readable} from 'stream'
 
 export class Connection {
   emitter: Emitter;
@@ -19,19 +18,22 @@ export class Connection {
   fileInfo: {
     size: number
   };
-  response: Readable;
+  response: Object;
   started: boolean;
+  supportsResume: boolean;
 
   constructor(url: string, pool: RangePool) {
+    this.emitter = new Emitter()
     this.url = url
     this.pool = pool
     this.started = false
-    this.emitter = new Emitter()
+    this.supportsResume = true
   }
   async activate(): Promise<Connection> {
     if (this.started) {
       return ;
     }
+    const range = getRange(this.worker)
 
     this.started = true
     this.fileInfo = { size: 0 }
@@ -40,10 +42,11 @@ export class Connection {
       url: this.url,
       headers: {
         'User-Agent': 'sb-downloader for Node.js',
-        'Range': getRange(this.worker)
+        'Range': range
       }
     })
     this.fileInfo.size = parseInt(this.response.headers['content-length']) || 0
+    this.supportsResume = range === null || this.response.statusCode === 206
     return this
   }
   start(fd: number) {
@@ -93,7 +96,6 @@ export class Connection {
     this.emitter.dispose()
     this.worker.dispose()
     if (this.response) {
-      // $FlowIgnore: It's an internal function for readable streams, but exposed by request API
       this.response.destroy()
     }
     this.started = false
