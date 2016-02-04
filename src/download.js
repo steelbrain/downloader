@@ -1,0 +1,100 @@
+'use strict'
+
+/* @flow */
+
+import Path from 'path'
+import {Emitter, CompositeDisposable} from 'sb-event-kit'
+import {RangePool} from 'range-pool'
+import {Connection} from './connection'
+import {fsOpen} from './helpers'
+import type {Disposable} from 'sb-event-kit'
+import type {Downloader$Job} from './types'
+
+export class Download {
+  options: Downloader$Job;
+  subscriptions: CompositeDisposable;
+  emitter: Emitter;
+  connections: Set<Connection>;
+  pool: RangePool;
+  lastPercentage: number;
+
+  constructor(options: Downloader$Job) {
+    this.subscriptions = new CompositeDisposable()
+    this.emitter = new Emitter()
+    this.connections = new Set()
+    this.pool = new RangePool(1024 * 1024 * 1024)
+    this.options = options
+    this.lastPercentage = -1
+  }
+  async start(): Promise {
+    const connection = await this.getConnection().activate()
+    const fileInfo = {
+      path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName()),
+      size: connection.getFileSize()
+    }
+    const fd = await fsOpen(fileInfo.path, 'w')
+
+    this.pool.length = fileInfo.size
+    connection.worker.limitIndex = fileInfo.size
+    this.handleConnection(fd, 0, connection)
+
+    const promises = []
+    for (let i = 1; i < this.options.connections; ++i) {
+      promises.push(this.handleConnection(fd, i, this.getConnection(i)))
+    }
+
+    await Promise.all(promises)
+
+    this.emitter.emit('did-start', {fileSize: fileInfo.size, filePath: fileInfo.path, url: this.options.url})
+  }
+  onDidError(callback: ((error: Error) => void)): Disposable {
+    return this.emitter.on('did-error', callback)
+  }
+  onDidProgress(callback: Function): Disposable {
+    return this.emitter.on('did-progress', callback)
+  }
+  onDidStart(callback: ((fileSize: number, filePath: string, url: string) => void)): Disposable {
+    return this.emitter.on('did-start', callback)
+  }
+  onDidComplete(callback: Function): Disposable {
+    return this.emitter.on('did-complete', callback)
+  }
+  dispose() {
+    this.subscriptions.dispose()
+  }
+  getConnection(): Connection {
+    const connection = new Connection(this.options.url, this.pool)
+    this.connections.add(connection)
+    return connection
+  }
+  async handleConnection(fd: number, index: number, connection: Connection, keepRunning: boolean = true): Promise {
+    if (!keepRunning || this.pool.hasCompleted() || (this.pool.hasWorkingWorker() && this.pool.getRemaining() < 2 * 1024 * 1024)) {
+      return ;
+    }
+    connection.onDidClose(() => {
+      keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
+
+      connection.dispose()
+      this.handleConnection(fd, index, this.getConnection(), keepRunning)
+    })
+    connection.onDidError(e => {
+      keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
+
+      this.emitter.emit('did-error', e)
+      connection.dispose()
+      this.handleConnection(fd, index, this.getConnection(), keepRunning)
+    })
+    connection.onDidProgress(_ => {
+      const percentage = Math.round((this.pool.getCompletedSteps() / this.pool.length) * 100)
+      if (percentage !== this.lastPercentage) {
+        this.lastPercentage = percentage
+        this.emitter.emit('did-progress', {percentage, completed: this.pool.getCompletedSteps(), maximum: this.pool.length})
+        if (percentage === 100) {
+          this.emitter.emit('did-complete')
+        }
+      }
+    })
+    await connection.activate()
+    connection.start(fd)
+  }
+}
