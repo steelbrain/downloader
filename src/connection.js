@@ -74,9 +74,6 @@ export class Connection {
     })
     this.response.resume()
   }
-  getResponse(): Object {
-    return this.response
-  }
   getFileSize(): number {
     return this.fileInfo.size
   }
