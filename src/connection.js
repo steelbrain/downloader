@@ -4,96 +4,53 @@
 
 import URL from 'url'
 import Path from 'path'
-import FS from 'fs'
-import request from 'request'
-import {promisedRequest} from './helpers'
-import {CompositeDisposable, Emitter, Disposable} from 'sb-event-kit'
-import type {PoolWorker} from 'range-pool'
+import {Emitter} from 'sb-event-kit'
+import {promisedRequest, getRange} from './helpers'
+import type {RangePool, PoolWorker} from 'range-pool'
+import type {Readable} from 'stream'
 
 export class Connection {
-  subscriptions: CompositeDisposable;
   emitter: Emitter;
   url: string;
-  fileSize: number;
-  response: Object;
+  pool: RangePool;
   worker: PoolWorker;
+  fileInfo: {
+    size: number
+  };
+  response: Readable;
 
-  constructor(url: string, worker: PoolWorker) {
+  constructor(url: string, pool: RangePool) {
     this.url = url
-    this.worker = worker
-    this.fileSize = 0
-
-    this.subscriptions = new CompositeDisposable()
-    this.emitter = new Emitter()
-
-    this.subscriptions.add(this.emitter)
+    this.pool = pool
   }
   async activate(): Promise {
-    let range = null
-    if (this.worker.getCurrentIndex() !== 0) {
-      range = this.worker.getCurrentIndex() + '-'
-      if (this.worker.getIndexLimit() !== Infinity) {
-        range += this.worker.getIndexLimit()
-      }
-    }
-
+    this.fileInfo = { size: 0 }
+    this.worker = this.pool.createWorker()
+    this.emitter = new Emitter()
     this.response = await promisedRequest({
       url: this.url,
       headers: {
         'User-Agent': 'sb-downloader for Node.js',
-        'Range': range === null ? null : 'bytes=' + range
+        'Range': getRange(this.worker)
       }
     })
-
-    this.response.on('error', e => this.emitter.emit('error', e))
-    this.response.on('close', () => this.dispose())
-
-    this.fileSize = parseInt(this.response.headers['content-length']) || 0
-    return range === null || this.response.statusCode === 206
+    this.fileInfo.size = parseInt(this.response.headers['content-length']) || 0
   }
-  pipe(fd: number) {
-    this.response.on('data', chunk => {
-      const chunkLength = chunk.length
-      const remaining = this.worker.getRemaining()
-      const shouldClose = remaining <= chunkLength
-
-      if (chunkLength > remaining) {
-        chunk = chunk.slice(0, remaining)
-      }
-
-      FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), error => {
-        if (error) {
-          this.emitter.emit('error', error)
-        }
-      })
-      this.worker.advance(chunk.length)
-      if (shouldClose) {
-        this.dispose()
-      }
-    })
+  start(fd: number) {
     this.response.resume()
   }
-  onError(callback: Function): Disposable {
-    return this.emitter.on('error', callback)
-  }
-  onDidClose(callback: Function): Disposable {
-    return this.emitter.on('did-close', callback)
+  getResponse(): Object {
+    return this.response
   }
   getFileSize(): number {
-    return this.fileSize
+    return this.fileInfo.size
   }
   getFileName(): string {
     const parsed = URL.parse(this.url, true)
     return Path.basename(parsed.pathname || '')
   }
   dispose() {
-    this.emitter.emit('did-close')
-    this.subscriptions.dispose()
-    if (this.response) {
-      this.response.destroy()
-    }
-  }
-  static create(url: string, worker: PoolWorker) {
-    return new Connection(url, worker)
+    this.worker.dispose()
+    this.emitter.dispose()
   }
 }
