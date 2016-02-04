@@ -33,11 +33,12 @@ export class Connection {
     if (this.started) {
       return ;
     }
-    const range = getRange(this.worker)
 
     this.started = true
     this.fileInfo = { size: 0 }
     this.worker = this.pool.createWorker()
+    const range = getRange(this.worker)
+
     this.response = await promisedRequest({
       url: this.url,
       headers: {
