@@ -4,6 +4,8 @@
   "description": "A nice node.js multi-connection downloader",
   "main": "lib/index.js",
   "dependencies": {
+    "filesize": "^3.2.1",
+    "minimist": "^1.2.0",
     "request": "^2.69.0",
     "sb-event-kit": "^1.0.3"
   },
