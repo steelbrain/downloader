@@ -4,11 +4,14 @@
   "description": "A nice node.js multi-connection downloader",
   "main": "lib/index.js",
   "bin": {
-    "download": "./cli/download"
+    "download": "./cli/download.js"
   },
   "dependencies": {
+    "chalk": "^1.1.1",
     "filesize": "^3.2.1",
     "minimist": "^1.2.0",
+    "ms": "^0.7.1",
+    "progress": "^1.1.8",
     "range-pool": "^1.0.1",
     "request": "^2.69.0",
     "sb-event-kit": "^1.0.3"

@@ -6,6 +6,7 @@ const ProgressBar = require('progress')
 const minimist = require('minimist')
 const fileSize = require('filesize')
 const chalk = require('chalk')
+const ms = require('ms')
 const parameters = minimist(process.argv.slice(2))
 
 if (parameters.v) {
@@ -52,7 +53,9 @@ if (parameters.v) {
     lastCompleted = info.completed
   })
   download.onDidComplete(function() {
-    console.log(`\n  File saved to ${chalk.green(downloadInfo.filePath)} `)
+    const timeTaken = process.uptime()
+    const bytesPerSecond = Math.round(downloadInfo.fileSize / timeTaken)
+    console.log(`\n  File saved to ${chalk.green(downloadInfo.filePath)} in ${ms(timeTaken * 1000)} (${fileSize(bytesPerSecond)}/s)`)
   })
   download.start().catch(e => console.error(e.stack || e))
 }
