@@ -25,14 +25,14 @@ export class Download {
     this.options = options
   }
   async start(): Promise {
-    const connection = await this.getConnection(0).activate()
+    const connection = await this.getConnection().activate()
     const fileInfo = {
       path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName()),
       size: connection.getFileSize()
     }
     const fd = await fsOpen(fileInfo.path, 'w')
 
-    this.pool.limit = fileInfo.size
+    this.pool.length = fileInfo.size
     connection.worker.limitIndex = fileInfo.size
     this.handleConnection(fd, 0, connection)
 
@@ -60,7 +60,7 @@ export class Download {
   dispose() {
     this.subscriptions.dispose()
   }
-  getConnection(index: number): Connection {
+  getConnection(): Connection {
     const connection = new Connection(this.options.url, this.pool)
     this.connections.add(connection)
     return connection
@@ -73,14 +73,14 @@ export class Download {
       keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
 
       connection.dispose()
-      this.handleConnection(fd, index, connection, keepRunning)
+      this.handleConnection(fd, index, this.getConnection(), keepRunning)
     })
     connection.onDidError(e => {
       keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
 
       this.emitter.emit('did-error', e)
       connection.dispose()
-      this.handleConnection(fd, index, connection, keepRunning)
+      this.handleConnection(fd, index, this.getConnection(), keepRunning)
     })
     await connection.activate()
     connection.start(fd)
