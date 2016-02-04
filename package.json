@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A nice node.js multi-connection downloader",
   "main": "lib/index.js",
+  "bin": {
+    "download": "./cli/download"
+  },
   "dependencies": {
     "filesize": "^3.2.1",
     "minimist": "^1.2.0",
