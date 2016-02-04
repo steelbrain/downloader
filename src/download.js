@@ -88,7 +88,7 @@ export class Download {
       const percentage = Math.round((this.pool.getCompletedSteps() / this.pool.length) * 100)
       if (percentage !== this.lastPercentage) {
         this.lastPercentage = percentage
-        this.emitter.emit('did-progress', percentage)
+        this.emitter.emit('did-progress', {percentage, completed: this.pool.getCompletedSteps(), maximum: this.pool.length})
         if (percentage === 100) {
           this.emitter.emit('did-complete')
         }
