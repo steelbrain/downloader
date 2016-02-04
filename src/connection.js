@@ -100,6 +100,7 @@ export class Connection {
       this.response.destroy()
     }
     this.started = false
-    this.emitter = new Emitter()
+    this.pool = null
+    this.response = null
   }
 }
