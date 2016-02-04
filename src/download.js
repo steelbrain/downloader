@@ -34,10 +34,11 @@ export class Download {
 
     this.pool.limit = fileInfo.size
     connection.worker.limitIndex = fileInfo.size
+    this.handleConnection(fd, 0, connection)
 
     const promises = []
     for (let i = 1; i < this.options.connections; ++i) {
-      promises.push(this.handleConnection(fd, this.getConnection(i)))
+      promises.push(this.handleConnection(fd, i, this.getConnection(i)))
     }
 
     await Promise.all(promises)
@@ -64,18 +65,22 @@ export class Download {
     this.connections.add(connection)
     return connection
   }
-  async handleConnection(fd: number, connection: Connection): Promise {
-    if (this.pool.hasCompleted()) {
+  async handleConnection(fd: number, index: number, connection: Connection, keepRunning: boolean = true): Promise {
+    if (!keepRunning || this.pool.hasCompleted()) {
       return ;
     }
     connection.onDidClose(() => {
+      keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
+
       connection.dispose()
-      this.handleConnection(fd, connection)
+      this.handleConnection(fd, index, connection, keepRunning)
     })
     connection.onDidError(e => {
+      keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
+
       this.emitter.emit('did-error', e)
       connection.dispose()
-      this.handleConnection(fd, connection)
+      this.handleConnection(fd, index, connection, keepRunning)
     })
     await connection.activate()
     connection.start(fd)
