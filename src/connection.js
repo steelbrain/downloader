@@ -20,15 +20,22 @@ export class Connection {
     size: number
   };
   response: Readable;
+  started: boolean;
 
   constructor(url: string, pool: RangePool) {
     this.url = url
     this.pool = pool
+    this.started = false
+    this.emitter = new Emitter()
   }
-  async activate(): Promise {
+  async activate(): Promise<Connection> {
+    if (this.started) {
+      return ;
+    }
+
+    this.started = true
     this.fileInfo = { size: 0 }
     this.worker = this.pool.createWorker()
-    this.emitter = new Emitter()
     this.response = await promisedRequest({
       url: this.url,
       headers: {
@@ -37,6 +44,7 @@ export class Connection {
       }
     })
     this.fileInfo.size = parseInt(this.response.headers['content-length']) || 0
+    return this
   }
   start(fd: number) {
     this.response.on('data', chunk => {
@@ -88,5 +96,7 @@ export class Connection {
       // $FlowIgnore: It's an internal function for readable streams, but exposed by request API
       this.response.destroy()
     }
+    this.started = false
+    this.emitter = new Emitter()
   }
 }
