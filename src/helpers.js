@@ -11,6 +11,7 @@ export function promisedRequest(options: Object): Promise{
     const job = request(options)
     job.on('error', reject)
     job.on('response', resolve)
+    job.pause()
   })
 }
 

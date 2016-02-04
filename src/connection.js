@@ -5,8 +5,9 @@
 import URL from 'url'
 import Path from 'path'
 import FS from 'fs'
-import {CompositeDisposable, Emitter, Disposable} from 'sb-event-kit'
+import request from 'request'
 import {promisedRequest} from './helpers'
+import {CompositeDisposable, Emitter, Disposable} from 'sb-event-kit'
 import type {PoolWorker} from 'range-pool'
 
 export class Connection {
@@ -45,7 +46,7 @@ export class Connection {
     })
 
     this.response.on('error', e => this.emitter.emit('error', e))
-    this.response.on('close', () => this.emitter.emit('did-close'))
+    this.response.on('close', () => this.dispose())
 
     this.fileSize = parseInt(this.response.headers['content-length']) || 0
     return range === null || this.response.statusCode === 206
@@ -59,26 +60,24 @@ export class Connection {
       if (chunkLength > remaining) {
         chunk = chunk.slice(0, remaining)
       }
-      if (shouldClose) {
-        this.response.destroy()
-      }
 
-      FS.write(fd, chunk, 0, chunkLength, this.worker.getCurrentIndex(), error => {
+      FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), error => {
         if (error) {
           this.emitter.emit('error', error)
         }
       })
       this.worker.advance(chunk.length)
+      if (shouldClose) {
+        this.dispose()
+      }
     })
+    this.response.resume()
   }
   onError(callback: Function): Disposable {
     return this.emitter.on('error', callback)
   }
   onDidClose(callback: Function): Disposable {
     return this.emitter.on('did-close', callback)
-  }
-  onDidGetResponse(callback: Function): Disposable {
-    return this.emitter.on('did-get-response', callback)
   }
   getFileSize(): number {
     return this.fileSize
@@ -88,7 +87,11 @@ export class Connection {
     return Path.basename(parsed.pathname || '')
   }
   dispose() {
+    this.emitter.emit('did-close')
     this.subscriptions.dispose()
+    if (this.response) {
+      this.response.destroy()
+    }
   }
   static create(url: string, worker: PoolWorker) {
     return new Connection(url, worker)
