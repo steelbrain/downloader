@@ -25,7 +25,7 @@ export class Download {
     this.options = options
   }
   async start(): Promise {
-    const connection = await this.getConnection(0)
+    const connection = await this.getConnection(0).activate()
     const fileInfo = {
       path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName()),
       size: connection.getFileSize()
@@ -37,15 +37,12 @@ export class Download {
 
     const promises = []
     for (let i = 1; i < this.options.connections; ++i) {
-      promises.push(this.getConnection(i))
+      promises.push(this.handleConnection(fd, this.getConnection(i)))
     }
 
     await Promise.all(promises)
 
     this.emitter.emit('did-start', {fileSize: fileInfo.path, filePath: fileInfo.path, url: this.options.url})
-    for (const connection of this.connections) {
-      connection.start(fd)
-    }
   }
   onDidError(callback: ((error: Error) => void)): Disposable {
     return this.emitter.on('did-error', callback)
@@ -62,10 +59,25 @@ export class Download {
   dispose() {
     this.subscriptions.dispose()
   }
-  async getConnection(index: number): Promise<Connection> {
+  getConnection(index: number): Connection {
     const connection = new Connection(this.options.url, this.pool)
     this.connections.add(connection)
-    await connection.activate()
     return connection
+  }
+  async handleConnection(fd: number, connection: Connection): Promise {
+    if (this.pool.hasCompleted()) {
+      return ;
+    }
+    connection.onDidClose(() => {
+      connection.dispose()
+      this.handleConnection(fd, connection)
+    })
+    connection.onDidError(e => {
+      this.emitter.emit('did-error', e)
+      connection.dispose()
+      this.handleConnection(fd, connection)
+    })
+    await connection.activate()
+    connection.start(fd)
   }
 }
