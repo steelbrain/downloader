@@ -10,7 +10,7 @@ const ms = require('ms')
 const parameters = minimist(process.argv.slice(2))
 
 if (parameters.v) {
-  console.log('multi-connection-downloader: version', require('../package.json').version)
+  console.log('m-downloader: version', require('../package.json').version)
 } else if (parameters.h || parameters['_'].length < 1 || parameters['_'].length > 2) {
   console.error('Usage:\n\t$ download url [filePath] [--max-connections=4]')
 } else {
