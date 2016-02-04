@@ -21,7 +21,7 @@ export class Download {
     this.subscriptions = new CompositeDisposable()
     this.emitter = new Emitter()
     this.connections = new Set()
-    this.pool = new RangePool(1)
+    this.pool = new RangePool(1024 * 1024 * 1024)
     this.options = options
   }
   async start(): Promise {
@@ -43,7 +43,7 @@ export class Download {
 
     await Promise.all(promises)
 
-    this.emitter.emit('did-start', {fileSize: fileInfo.path, filePath: fileInfo.path, url: this.options.url})
+    this.emitter.emit('did-start', {fileSize: fileInfo.size, filePath: fileInfo.path, url: this.options.url})
   }
   onDidError(callback: ((error: Error) => void)): Disposable {
     return this.emitter.on('did-error', callback)
