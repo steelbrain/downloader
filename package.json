@@ -1,0 +1,34 @@
+{
+  "name": "multi-connection-downloader",
+  "version": "1.0.0",
+  "description": "A nice node.js multi-connection downloader",
+  "main": "lib/index.js",
+  "dependencies": {
+    "request": "^2.69.0",
+    "sb-event-kit": "^1.0.3"
+  },
+  "devDependencies": {
+    "babel-preset-steelbrain": "^1.0.1",
+    "babel-preset-steelbrain-flow": "^1.0.1",
+    "babel-preset-steelbrain-async": "^1.0.1",
+    "ucompiler-plugin-babel": "^3.1.1"
+  },
+  "scripts": {
+    "test": "apm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steelbrain/multi-connection-downloader.git"
+  },
+  "keywords": [
+    "download",
+    "connections",
+    "cli"
+  ],
+  "author": "steelbrain",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/steelbrain/multi-connection-downloader/issues"
+  },
+  "homepage": "https://github.com/steelbrain/multi-connection-downloader#readme"
+}
