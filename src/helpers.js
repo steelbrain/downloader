@@ -27,8 +27,4 @@ export function getRange(worker: PoolWorker): ?string {
   return range ? 'bytes=' + range : range
 }
 
-export const FS = {
-  open: promisify(NativeFS.open),
-  close: promisify(NativeFS.close),
-  write: promisify(NativeFS.write)
-}
+export const fsOpen = promisify(NativeFS.open)
