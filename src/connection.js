@@ -7,6 +7,7 @@ import URL from 'url'
 import Path from 'path'
 import {Emitter} from 'sb-event-kit'
 import {promisedRequest, getRange} from './helpers'
+import type {Disposable} from 'sb-event-kit'
 import type {RangePool, PoolWorker} from 'range-pool'
 import type {Readable} from 'stream'
 
@@ -49,11 +50,13 @@ export class Connection {
 
       FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), error => {
         if (error) {
-          this.emitter.emit('error', error)
+          this.emitter.emit('did-error', error)
         }
       })
       this.worker.advance(chunk.length)
+      this.emitter.emit('did-progress', this.worker.getCompletionPercentage())
       if (shouldClose) {
+        this.emitter.emit('did-close')
         this.dispose()
       }
     })
@@ -69,8 +72,14 @@ export class Connection {
     const parsed = URL.parse(this.url, true)
     return Path.basename(parsed.pathname || '')
   }
-  onDidClose(callback: Function) {
+  onDidClose(callback: Function): Disposable {
     return this.emitter.on('did-close', callback)
+  }
+  onDidProgress(callback: Function): Disposable {
+    return this.emitter.on('did-progress', callback)
+  }
+  onDidError(callback: Function): Disposable {
+    return this.emitter.on('did-error', callback)
   }
   dispose() {
     this.emitter.dispose()
