@@ -5,7 +5,7 @@ M-Downloader is an efficient, multi-connection downloader written in Node.js. By
 ## Installation
 
 ```
-npm install --save m-downloader
+npm install --global m-downloader
 ```
 
 ## Usage
