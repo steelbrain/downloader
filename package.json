@@ -1,5 +1,5 @@
 {
-  "name": "m-downloader",
+  "name": "sb-downloader",
   "version": "0.0.0",
   "description": "A nice node.js multi-connection downloader",
   "main": "lib/index.js",
@@ -28,7 +28,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/steelbrain/m-downloader.git"
+    "url": "git+https://github.com/steelbrain/downloader.git"
   },
   "keywords": [
     "download",
@@ -38,7 +38,7 @@
   "author": "steelbrain",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/steelbrain/m-downloader/issues"
+    "url": "https://github.com/steelbrain/downloader/issues"
   },
-  "homepage": "https://github.com/steelbrain/m-downloader#readme"
+  "homepage": "https://github.com/steelbrain/downloader#readme"
 }

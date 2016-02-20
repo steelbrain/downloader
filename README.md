@@ -1,11 +1,11 @@
-# M-Downloader
+# Downloader
 
-M-Downloader is an efficient, multi-connection downloader written in Node.js. By downloading the same file over multiple connections, it can double or triple the speed for high latency users.
+Downloader is an efficient, multi-connection downloader written in Node.js. By downloading the same file over multiple connections, it can double or triple the speed for high latency users.
 
 ## Installation
 
 ```
-npm install --global m-downloader
+npm install --global sb-downloader
 ```
 
 ## Usage
