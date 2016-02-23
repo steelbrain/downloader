@@ -70,7 +70,7 @@ export class Download {
     return connection
   }
   async handleConnection(fd: number, index: number, connection: Connection, keepRunning: boolean = true): Promise {
-    if (!keepRunning || this.pool.hasCompleted() || (this.pool.hasWorkingWorker() && this.pool.getRemaining() < 2 * 1024 * 1024)) {
+    if (!keepRunning || this.pool.hasCompleted() || (this.pool.getWorkingWorker() !== connection.worker && this.pool.getRemaining() < 2 * 1024 * 1024)) {
       connection.dispose()
       return ;
     }
