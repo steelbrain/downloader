@@ -10,6 +10,8 @@ import {fsOpen} from './helpers'
 import type {Disposable} from 'sb-event-kit'
 import type {Downloader$Job} from './types'
 
+let downloadCount = 0
+
 export class Download {
   options: Downloader$Job;
   subscriptions: CompositeDisposable;
@@ -29,7 +31,7 @@ export class Download {
   async start(): Promise {
     const connection = await this.getConnection().activate()
     const fileInfo = {
-      path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName()),
+      path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName() || 'download-' + (++downloadCount)),
       size: connection.getFileSize()
     }
     const fd = await fsOpen(fileInfo.path, 'w')
