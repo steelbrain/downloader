@@ -30,8 +30,11 @@ export class Download {
   }
   async start(): Promise {
     const connection = await this.getConnection().activate()
+    const filePath = Path.isAbsolute(this.options.target.file || '') ?
+      this.options.target.file :
+      Path.join(this.options.target.directory, this.options.target.file || connection.getFileName() || 'download-' + (++downloadCount))
     const fileInfo = {
-      path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName() || 'download-' + (++downloadCount)),
+      path: filePath,
       size: connection.getFileSize()
     }
     const fd = await fsOpen(fileInfo.path, 'w')
