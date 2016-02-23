@@ -93,7 +93,9 @@ export class Connection {
   }
   dispose() {
     this.emitter.dispose()
-    this.worker.dispose()
+    if (this.worker) {
+      this.worker.dispose()
+    }
     if (this.response) {
       this.response.destroy()
     }
