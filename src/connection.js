@@ -5,10 +5,15 @@
 import FS from 'fs'
 import URL from 'url'
 import Path from 'path'
+import ZLIB from 'zlib'
 import {Emitter} from 'sb-event-kit'
+import promisify from 'sb-promisify'
 import {promisedRequest, getRange} from './helpers'
 import type {Disposable} from 'sb-event-kit'
 import type {RangePool, PoolWorker} from 'range-pool'
+
+const deflate = promisify(ZLIB.deflate)
+const unzip = promisify(ZLIB.unzip)
 
 export class Connection {
   url: string;
@@ -17,6 +22,7 @@ export class Connection {
   headers: Object;
   emitter: Emitter;
   started: boolean;
+  encoding: 'gzip' | 'deflate' | 'none';
   fileInfo: {
     size: number
   };
@@ -29,6 +35,7 @@ export class Connection {
     this.headers = headers
     this.started = false
     this.emitter = new Emitter()
+    this.encoding = 'none'
     this.fileInfo = { size: 0 }
     this.supportsResume = true
   }
@@ -43,22 +50,33 @@ export class Connection {
 
     this.headers['User-Agent'] = 'sb-downloader for Node.js'
     this.headers['Range'] = range
+    this.headers['Accept-Encoding'] = 'gzip, deflate'
     this.response = await promisedRequest({
       url: this.url,
       headers: this.headers
     })
     this.fileInfo.size = parseInt(this.response.headers['content-length']) || 0
     this.supportsResume = range === null || this.response.statusCode === 206
+    const encoding = (this.response.headers['content-encoding'] || '').toLowerCase()
+    if (encoding == 'deflate' || encoding === 'gzip') {
+      this.encoding = encoding
+    }
     return this
   }
   start(fd: number) {
-    this.response.on('data', chunk => {
-      const chunkLength = chunk.length
+    this.response.on('data', async chunkRaw => {
       const remaining = this.worker.getRemaining()
-      const shouldClose = remaining <= chunkLength
-
+      const shouldClose = remaining <= chunkRaw.length
+      let chunkLength = chunkRaw.length
       if (chunkLength > remaining) {
-        chunk = chunk.slice(0, remaining)
+        chunkRaw = chunkRaw.slice(0, remaining)
+        chunkLength = chunkRaw.length
+      }
+      let chunk = chunkRaw
+      if (this.encoding === 'deflate') {
+        chunk = await deflate(chunk)
+      } else if (this.encoding === 'gzip') {
+        chunk = await unzip(chunk)
       }
 
       FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), error => {
@@ -66,7 +84,7 @@ export class Connection {
           this.emitter.emit('did-error', error)
         }
       })
-      this.worker.advance(chunk.length)
+      this.worker.advance(chunkLength)
       this.emitter.emit('did-progress', this.worker.getCompletionPercentage())
       if (shouldClose) {
         this.emitter.emit('did-close')
