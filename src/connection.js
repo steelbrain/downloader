@@ -32,6 +32,10 @@ export class Connection {
     this.supportsResume = true
   }
   async activate(): Promise<Connection> {
+    if (this.started) {
+      return ;
+    }
+
     this.started = true
     const range = getRange(this.worker)
 
