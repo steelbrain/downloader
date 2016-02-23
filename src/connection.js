@@ -53,7 +53,6 @@ export class Connection {
   }
   start(fd: number) {
     this.response.on('data', chunk => {
-      this.data.push(chunk.toString())
       const chunkLength = chunk.length
       const remaining = this.worker.getRemaining()
       const shouldClose = remaining <= chunkLength
