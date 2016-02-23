@@ -78,14 +78,18 @@ export class Download {
       keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
 
       connection.dispose()
-      this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      if (!this.pool.hasCompleted()) {
+        this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      }
     })
     connection.onDidError(e => {
       keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
 
       this.emitter.emit('did-error', e)
       connection.dispose()
-      this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      if (!this.pool.hasCompleted()) {
+        this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      }
     })
     connection.onDidProgress(_ => {
       const percentage = Math.round((this.pool.getCompletedSteps() / this.pool.length) * 100)
