@@ -15,6 +15,7 @@ if (parameters.v) {
   console.error('Usage:\n\t$ download url [filePath] [--max-connections=4]')
 } else {
   const url = parameters['_'][0]
+  const headers = [].concat(parameters['H'] || [])
   const filePath = parameters['_'][1] || null
   const maxConnections = parseInt(parameters['max-connections']) || 4
   let downloadInfo = {}
@@ -25,7 +26,8 @@ if (parameters.v) {
       directory: process.cwd(),
       file: filePath
     },
-    connections: maxConnections
+    connections: maxConnections,
+    headers: headers
   })
   download.onDidError(function(error) {
     console.error('Download Error', error.stack || error)
