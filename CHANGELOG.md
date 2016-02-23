@@ -1,4 +1,4 @@
-## 1.0.1
+## 1.1.0
 
 - Add support for custom headers
 - Fix a bug which won't let you download small files
