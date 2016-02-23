@@ -63,7 +63,7 @@ export class Download {
     this.subscriptions.dispose()
   }
   getConnection(): Connection {
-    const connection = new Connection(this.options.url, this.pool)
+    const connection = new Connection(this.options.url, Object.assign({}, this.options.headers), this.pool)
     this.connections.add(connection)
     return connection
   }

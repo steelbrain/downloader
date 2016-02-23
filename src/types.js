@@ -8,5 +8,6 @@ export type Downloader$Job = {
     directory: string,
     file?: ?string
   },
-  connections: number
+  connections: number,
+  headers?: Object
 }
