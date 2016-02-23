@@ -12,6 +12,7 @@ import type {RangePool, PoolWorker} from 'range-pool'
 
 export class Connection {
   url: string;
+  pool: RangePool;
   worker: PoolWorker;
   headers: Object;
   emitter: Emitter;
@@ -24,7 +25,7 @@ export class Connection {
 
   constructor(url: string, headers: Object, pool: RangePool) {
     this.url = url
-    this.worker = pool.createWorker()
+    this.pool = pool
     this.headers = headers
     this.started = false
     this.emitter = new Emitter()
@@ -36,6 +37,7 @@ export class Connection {
       return ;
     }
 
+    this.worker = this.pool.createWorker()
     this.started = true
     const range = getRange(this.worker)
 
@@ -51,6 +53,7 @@ export class Connection {
   }
   start(fd: number) {
     this.response.on('data', chunk => {
+      this.data.push(chunk.toString())
       const chunkLength = chunk.length
       const remaining = this.worker.getRemaining()
       const shouldClose = remaining <= chunkLength
