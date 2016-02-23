@@ -12,20 +12,29 @@ const parameters = minimist(process.argv.slice(2))
 if (parameters.v) {
   console.log('sb-downloader: version', require('../package.json').version)
 } else if (parameters.h || parameters['_'].length < 1 || parameters['_'].length > 2) {
-  console.error('Usage:\n\t$ download url [filePath] [--max-connections=4]')
+  console.error('Usage:\n\t$ download url [filePath] [--max-connections=4] [-H "Key: Value"]')
 } else {
   const url = parameters['_'][0]
+  const rawHeaders = [].concat(parameters['H'] || [])
+  const headers = {}
   const filePath = parameters['_'][1] || null
   const maxConnections = parseInt(parameters['max-connections']) || 4
   let downloadInfo = {}
 
+  rawHeaders.forEach(function(header) {
+    const chunks = header.split(':')
+    if (chunks.length === 2) {
+      headers[chunks[0].trim()] = chunks[1].trim()
+    }
+  })
   const download = Downloader.download({
     url: url,
     target: {
       directory: process.cwd(),
       file: filePath
     },
-    connections: maxConnections
+    connections: maxConnections,
+    headers: headers
   })
   download.onDidError(function(error) {
     console.error('Download Error', error.stack || error)

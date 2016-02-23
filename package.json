@@ -12,7 +12,7 @@
     "minimist": "^1.2.0",
     "ms": "^0.7.1",
     "progress": "^1.1.8",
-    "range-pool": "^1.0.2",
+    "range-pool": "^1.1.1",
     "request": "^2.69.0",
     "sb-event-kit": "^1.0.3",
     "sb-promisify": "^1.1.1"

@@ -11,22 +11,25 @@ import type {Disposable} from 'sb-event-kit'
 import type {RangePool, PoolWorker} from 'range-pool'
 
 export class Connection {
-  emitter: Emitter;
   url: string;
   pool: RangePool;
   worker: PoolWorker;
+  headers: Object;
+  emitter: Emitter;
+  started: boolean;
   fileInfo: {
     size: number
   };
   response: Object;
-  started: boolean;
   supportsResume: boolean;
 
-  constructor(url: string, pool: RangePool) {
-    this.emitter = new Emitter()
+  constructor(url: string, headers: Object, pool: RangePool) {
     this.url = url
     this.pool = pool
+    this.headers = headers
     this.started = false
+    this.emitter = new Emitter()
+    this.fileInfo = { size: 0 }
     this.supportsResume = true
   }
   async activate(): Promise<Connection> {
@@ -34,17 +37,15 @@ export class Connection {
       return ;
     }
 
-    this.started = true
-    this.fileInfo = { size: 0 }
     this.worker = this.pool.createWorker()
+    this.started = true
     const range = getRange(this.worker)
 
+    this.headers['User-Agent'] = 'sb-downloader for Node.js'
+    this.headers['Range'] = range
     this.response = await promisedRequest({
       url: this.url,
-      headers: {
-        'User-Agent': 'sb-downloader for Node.js',
-        'Range': range
-      }
+      headers: this.headers
     })
     this.fileInfo.size = parseInt(this.response.headers['content-length']) || 0
     this.supportsResume = range === null || this.response.statusCode === 206
@@ -92,12 +93,12 @@ export class Connection {
   }
   dispose() {
     this.emitter.dispose()
-    this.worker.dispose()
+    if (this.worker) {
+      this.worker.dispose()
+    }
     if (this.response) {
       this.response.destroy()
     }
     this.started = false
-    this.pool = null
-    this.response = null
   }
 }

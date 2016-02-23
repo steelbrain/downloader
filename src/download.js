@@ -10,6 +10,8 @@ import {fsOpen} from './helpers'
 import type {Disposable} from 'sb-event-kit'
 import type {Downloader$Job} from './types'
 
+let downloadCount = 0
+
 export class Download {
   options: Downloader$Job;
   subscriptions: CompositeDisposable;
@@ -29,7 +31,7 @@ export class Download {
   async start(): Promise {
     const connection = await this.getConnection().activate()
     const fileInfo = {
-      path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName()),
+      path: Path.join(this.options.target.directory, this.options.target.file || connection.getFileName() || 'download-' + (++downloadCount)),
       size: connection.getFileSize()
     }
     const fd = await fsOpen(fileInfo.path, 'w')
@@ -63,7 +65,7 @@ export class Download {
     this.subscriptions.dispose()
   }
   getConnection(): Connection {
-    const connection = new Connection(this.options.url, this.pool)
+    const connection = new Connection(this.options.url, Object.assign({}, this.options.headers), this.pool)
     this.connections.add(connection)
     return connection
   }
@@ -76,14 +78,18 @@ export class Download {
       keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
 
       connection.dispose()
-      this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      if (!this.pool.hasCompleted()) {
+        this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      }
     })
     connection.onDidError(e => {
       keepRunning = keepRunning && (connection.supportsResume ||  index === 0)
 
       this.emitter.emit('did-error', e)
       connection.dispose()
-      this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      if (!this.pool.hasCompleted()) {
+        this.handleConnection(fd, index, this.getConnection(), keepRunning)
+      }
     })
     connection.onDidProgress(_ => {
       const percentage = Math.round((this.pool.getCompletedSteps() / this.pool.length) * 100)
