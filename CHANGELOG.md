@@ -1,3 +1,7 @@
+## 1.1.1
+
+- Show KiB instead of kb in cli download complete message
+
 ## 1.1.0
 
 - Add support for custom headers
