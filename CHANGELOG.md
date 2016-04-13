@@ -1,3 +1,7 @@
+## 1.1.2
+
+- Workaround a babel bug which rendered this module functionless
+
 ## 1.1.1
 
 - Show KiB instead of kb in cli download complete message
