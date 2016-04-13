@@ -64,8 +64,9 @@ export class Connection {
     return this
   }
   start(fd: number) {
-    this.response.on('data', async chunkRaw => {
-      const remaining = this.worker.getRemaining()
+    const _this = this
+    this.response.on('data', async function(chunkRaw) {
+      const remaining = _this.worker.getRemaining()
       const shouldClose = remaining <= chunkRaw.length
       let chunkLength = chunkRaw.length
       if (chunkLength > remaining) {
@@ -73,22 +74,22 @@ export class Connection {
         chunkLength = chunkRaw.length
       }
       let chunk = chunkRaw
-      if (this.encoding === 'deflate') {
+      if (_this.encoding === 'deflate') {
         chunk = await deflate(chunk)
-      } else if (this.encoding === 'gzip') {
+      } else if (_this.encoding === 'gzip') {
         chunk = await unzip(chunk)
       }
 
-      FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), error => {
+      FS.write(fd, chunk, 0, chunk.length, _this.worker.getCurrentIndex(), function(error) {
         if (error) {
-          this.emitter.emit('did-error', error)
+          _this.emitter.emit('did-error', error)
         }
       })
-      this.worker.advance(chunkLength)
-      this.emitter.emit('did-progress', this.worker.getCompletionPercentage())
+      _this.worker.advance(chunkLength)
+      _this.emitter.emit('did-progress', _this.worker.getCompletionPercentage())
       if (shouldClose) {
-        this.emitter.emit('did-close')
-        this.dispose()
+        _this.emitter.emit('did-close')
+        _this.dispose()
       }
     })
     this.response.resume()
