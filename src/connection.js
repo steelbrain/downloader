@@ -12,7 +12,7 @@ import {promisedRequest, getRange} from './helpers'
 import type {Disposable} from 'sb-event-kit'
 import type {RangePool, PoolWorker} from 'range-pool'
 
-const deflate = promisify(ZLIB.deflate)
+const inflate = promisify(ZLIB.inflate)
 const unzip = promisify(ZLIB.unzip)
 
 export class Connection {
@@ -75,7 +75,7 @@ export class Connection {
       }
       let chunk = chunkRaw
       if (_this.encoding === 'deflate') {
-        chunk = await deflate(chunk)
+        chunk = await inflate(chunk)
       } else if (_this.encoding === 'gzip') {
         chunk = await unzip(chunk)
       }

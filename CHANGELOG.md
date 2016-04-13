@@ -1,3 +1,7 @@
+## Upcoming
+
+- Fix support for deflate content encoding
+
 ## 1.1.2
 
 - Workaround a babel bug which rendered this module functionless
