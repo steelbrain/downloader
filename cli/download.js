@@ -9,6 +9,13 @@ const chalk = require('chalk')
 const ms = require('ms')
 const parameters = minimist(process.argv.slice(2))
 
+process.on('uncaughtException', function(error) {
+  console.error(error && error.stack || error)
+})
+process.on('unhandledRejection', function(reason, promise) {
+  console.error('Unhandled Rejection at: Promise ', p, ' reason: ', reason)
+})
+
 if (parameters.v) {
   console.log('sb-downloader: version', require('../package.json').version)
 } else if (parameters.h || parameters['_'].length < 1 || parameters['_'].length > 2) {
