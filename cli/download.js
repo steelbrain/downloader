@@ -57,7 +57,7 @@ if (parameters.v) {
       return ;
     }
     if (!progress) {
-      progress = new  ProgressBar(`  Downloading [:bar] ${chalk.yellow(':current KiB/:total KiB')}`, {
+      progress = new  ProgressBar(`  Downloading [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
         complete: '=',
         incomplete: '_',
         width: 50,
