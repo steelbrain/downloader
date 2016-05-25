@@ -1,5 +1,6 @@
 ## Upcoming
 
+- Fix a typo in downloader bin
 - Fix support for deflate content encoding
 
 ## 1.1.2

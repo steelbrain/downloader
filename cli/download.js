@@ -13,7 +13,7 @@ process.on('uncaughtException', function(error) {
   console.error(error && error.stack || error)
 })
 process.on('unhandledRejection', function(reason, promise) {
-  console.error('Unhandled Rejection at: Promise ', p, ' reason: ', reason)
+  console.error('Unhandled Rejection at: Promise ', promise, ' reason: ', reason)
 })
 
 if (parameters.v) {
