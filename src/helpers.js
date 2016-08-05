@@ -82,4 +82,8 @@ export function getRangeHeader(worker: RangeWorker): ?string {
   return `bytes=${range}`
 }
 
-export const open = promisify(FS.open)
+export const open: ((filePath: string) => Promise<number>) = promisify(FS.open)
+export const unlink: ((filePath: string) => Promise<void>) = promisify(FS.unlink)
+export const exists: ((filePath: string) => Promise<boolean>) = promisify(FS.access)
+export const readFile: ((filePath: string) => Promise<Buffer>) = promisify(FS.readFile)
+export const writeFile: ((filePath: string, contents: string) => Promise<Buffer>) = promisify(FS.writeFile)

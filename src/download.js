@@ -1,9 +1,9 @@
 /* @flow */
 
 import Path from 'path'
-import { Emitter, CompositeDisposable } from 'sb-event-kit'
+import { Emitter, CompositeDisposable, Disposable } from 'sb-event-kit'
 import RangePool from 'range-pool'
-import type { Disposable } from 'sb-event-kit'
+import Manifest from './manifest'
 import Connection from './connection'
 import { open, fillConfig } from './helpers'
 import type { DownloadConfig, DownloadJob } from './types'
@@ -34,15 +34,19 @@ export default class Download {
       Path.resolve(this.options.output.directory, this.options.output.file || fileInfo.fileName || 'download-' + (++downloadCount))
 
     let connections = 1
-    const fd = await open(filePath, 'w')
-
-    this.pool.length = fileInfo.fileName
-    connection.worker.limitIndex = fileInfo.fileSize
-    connection.attach(fd)
+    const fdPromise = open(filePath, 'w')
 
     if (fileInfo.supportsResume && Number.isFinite(fileInfo.fileSize)) {
+      // Clear previous connection
+      this.connections.delete(connection)
+      connection.dispose()
+
+      const fd = await fdPromise
+      const manifest = await Manifest.create(this.options.url, filePath, fileInfo.fileSize)
       const promises = []
-      for (let i = 1; i < this.options.connections; ++i) {
+
+      this.pool = manifest.data.pool
+      for (let i = 0; i < this.options.connections; ++i) {
         const entry = this.getConnection()
         entry.attach(fd)
         promises.push(entry.request())
@@ -50,6 +54,19 @@ export default class Download {
       }
 
       await Promise.all(promises)
+      this.onDidComplete(async function() {
+        await manifest.unlink()
+      })
+      const updateInterval = setInterval(function() {
+        manifest.write()
+      }, 5000)
+      this.subscriptions.add(new Disposable(function() {
+        clearInterval(updateInterval)
+      }))
+    } else {
+      this.pool.length = fileInfo.fileName
+      connection.worker.limitIndex = fileInfo.fileSize
+      connection.attach(await fdPromise)
     }
 
     this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections })
