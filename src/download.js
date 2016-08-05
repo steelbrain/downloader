@@ -5,32 +5,32 @@ import { Emitter, CompositeDisposable } from 'sb-event-kit'
 import RangePool from 'range-pool'
 import type { Disposable } from 'sb-event-kit'
 import Connection from './connection'
-import { fsOpen } from './helpers'
-import type { Downloader$Job } from './types'
+import { fsOpen, fillConfig } from './helpers'
+import type { DownloadConfig, DownloadJob } from './types'
 
 let downloadCount = 0
 
 export default class Download {
-  options: Downloader$Job;
+  options: DownloadJob;
   subscriptions: CompositeDisposable;
   emitter: Emitter;
   connections: Set<Connection>;
   pool: RangePool;
   lastPercentage: number;
 
-  constructor(options: Downloader$Job) {
+  constructor(options: DownloadConfig) {
     this.subscriptions = new CompositeDisposable()
     this.emitter = new Emitter()
     this.connections = new Set()
     this.pool = new RangePool(1024 * 1024 * 1024)
-    this.options = options
+    this.options = fillConfig(options)
     this.lastPercentage = -1
   }
   async start(): Promise<void> {
     const connection = await this.getConnection().activate()
-    const filePath = Path.isAbsolute(this.options.target.file || '') ?
-      this.options.target.file :
-      Path.join(this.options.target.directory, this.options.target.file || connection.getFileName() || 'download-' + (++downloadCount))
+    const filePath = Path.isAbsolute(this.options.output.file || '') ?
+      this.options.output.file :
+      Path.join(this.options.output.directory, this.options.output.file || connection.getFileName() || 'download-' + (++downloadCount))
     const fileInfo = {
       path: filePath,
       size: connection.getFileSize(),
