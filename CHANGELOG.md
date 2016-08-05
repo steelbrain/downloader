@@ -1,3 +1,7 @@
+## 2.0.1
+
+- Fix a bug where new workers would not be spawned after one finishes it's task
+
 ## 2.0.0
 
 - Fix a typo in downloader bin
