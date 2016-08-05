@@ -7,7 +7,7 @@ import ZLIB from 'zlib'
 import { Emitter } from 'sb-event-kit'
 import promisify from 'sb-promisify'
 import type { Disposable } from 'sb-event-kit'
-import type { RangePool, PoolWorker } from 'range-pool'
+import type { RangePool, RangeWorker } from 'range-pool'
 import { promisedRequest, getRange } from './helpers'
 
 const inflate = promisify(ZLIB.inflate)
@@ -16,7 +16,7 @@ const unzip = promisify(ZLIB.unzip)
 export default class Connection {
   url: string;
   pool: RangePool;
-  worker: PoolWorker;
+  worker: RangeWorker;
   headers: Object;
   emitter: Emitter;
   started: boolean;

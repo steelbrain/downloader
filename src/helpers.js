@@ -1,11 +1,11 @@
 /* @flow */
 
+import FS from 'fs'
 import Path from 'path'
-import NativeFS from 'fs'
 import invariant from 'assert'
 import request from 'request'
 import promisify from 'sb-promisify'
-import type { PoolWorker } from 'range-pool'
+import type { RangeWorker } from 'range-pool'
 import type { DownloadConfig, DownloadJob } from './types'
 
 export function fillConfig(config: DownloadConfig): DownloadJob {
@@ -71,15 +71,8 @@ export function promisedRequest(options: Object): Promise<Object> {
   })
 }
 
-export function getRange(worker: PoolWorker): ?string {
-  let range = null
-  if (worker.getCurrentIndex() !== 0) {
-    range = worker.getCurrentIndex() + '-'
-    if (worker.getIndexLimit() !== Infinity) {
-      range += worker.getIndexLimit()
-    }
-  }
-  return range ? 'bytes=' + range : range
+export function getRange(worker: RangeWorker): ?string {
+  return worker.getCurrentIndex() + '-' + worker.getIndexLimit()
 }
 
-export const fsOpen = promisify(NativeFS.open)
+export const open = promisify(FS.open)

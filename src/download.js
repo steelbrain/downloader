@@ -5,7 +5,7 @@ import { Emitter, CompositeDisposable } from 'sb-event-kit'
 import RangePool from 'range-pool'
 import type { Disposable } from 'sb-event-kit'
 import Connection from './connection'
-import { fsOpen, fillConfig } from './helpers'
+import { open, fillConfig } from './helpers'
 import type { DownloadConfig, DownloadJob } from './types'
 
 let downloadCount = 0
@@ -35,7 +35,7 @@ export default class Download {
       path: filePath,
       size: connection.getFileSize(),
     }
-    const fd = await fsOpen(fileInfo.path, 'w')
+    const fd = await open(fileInfo.path, 'w')
 
     this.pool.length = fileInfo.size
     connection.worker.limitIndex = fileInfo.size
