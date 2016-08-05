@@ -1,13 +1,11 @@
-'use strict'
-
 /* @flow */
 
 import NativeFS from 'fs'
 import request from 'request'
 import promisify from 'sb-promisify'
-import type {PoolWorker} from 'range-pool'
+import type { PoolWorker } from 'range-pool'
 
-export function promisedRequest(options: Object): Promise{
+export function promisedRequest(options: Object): Promise<Object> {
   return new Promise(function(resolve, reject) {
     const job = request(options)
     job.on('error', reject)
