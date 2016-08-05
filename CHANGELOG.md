@@ -1,7 +1,9 @@
-## Upcoming
+## 2.0.0
 
 - Fix a typo in downloader bin
 - Fix support for deflate content encoding
+- Internal rewrite feature a lot of stability improvements
+- Add support for resuming downloads even after program exits
 
 ## 1.1.2
 
