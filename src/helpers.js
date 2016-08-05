@@ -28,6 +28,8 @@ export function fillConfig(config: DownloadConfig): DownloadJob {
       file: Path.basename(filePath),
       directory: Path.dirname(filePath),
     }
+  } else {
+    throw new TypeError('config.output must be valid')
   }
 
   toReturn.headers = {}

@@ -34,7 +34,7 @@ export default class Connection {
   }
   async request(): Promise<{ fileSize: number, fileName: ?string, supportsResume: boolean, contentEncoding: 'none' | 'deflate' | 'gzip' }> {
     if (this.socket) {
-      this.socket.close()
+      this.socket.destroy()
     }
 
     const response = this.socket = await request({
@@ -52,11 +52,13 @@ export default class Connection {
 
     let stream = response
     const fileSize = parseInt(response.headers['content-length'], 10) || Infinity
-    const supportsResume = (response.headers['accept-ranges'] || '').toLowercase().indexOf('bytes') !== -1
+    const supportsResume = (response.headers['accept-ranges'] || '').toLowerCase().indexOf('bytes') !== -1
     const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase()
-    const fileName = {}.hasOwnProperty.call(response.headers, 'content-disposition') && FILENAME_HEADER_REGEX.test(response.headers['content-disposition']) ?
-      FILENAME_HEADER_REGEX.exec(response.headers['content-disposition'])[2] :
-      null
+    let fileName = null
+    if ({}.hasOwnProperty.call(response.headers, 'content-disposition') && FILENAME_HEADER_REGEX.test(response.headers['content-disposition'])) {
+      const matches = FILENAME_HEADER_REGEX.exec(response.headers['content-disposition'])
+      fileName = matches[2] || matches[3]
+    }
 
     if (contentEncoding === 'deflate') {
       stream = stream.pipe(zlib.createInflate())
@@ -74,7 +76,9 @@ export default class Connection {
         }
 
         FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), function(error) {
-          this.emitter.emit('did-error', error)
+          if (error) {
+            this.emitter.emit('did-error', error)
+          }
         })
         this.worker.advance(chunk.length)
         const newPercentage = this.worker.getCompletionPercentage()
@@ -88,6 +92,8 @@ export default class Connection {
         }
       })
       stream.resume()
+    }).catch(error => {
+      this.emitter.emit('did-error', error)
     })
 
     return {
@@ -108,7 +114,7 @@ export default class Connection {
   }
   dispose() {
     if (this.socket) {
-      this.socket.close()
+      this.socket.destroy()
     }
     this.worker.dispose()
     this.subscriptions.dispose()
