@@ -55,7 +55,7 @@ export default class Download {
 
       await Promise.all(promises)
       this.onDidComplete(async function() {
-        await manifest.unlink()
+        await manifest.delete()
       })
       const updateInterval = setInterval(function() {
         manifest.write()

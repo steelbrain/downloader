@@ -77,7 +77,7 @@ export default class Connection {
       stream.on('data', givenChunk => {
         let chunk = givenChunk
         const remaining = this.worker.getRemaining()
-        if (remaining > chunk.length) {
+        if (chunk.length > remaining) {
           chunk = chunk.slice(0, remaining)
         }
 
