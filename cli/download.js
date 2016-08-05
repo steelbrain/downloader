@@ -2,6 +2,7 @@
 'use strict'
 
 const ms = require('ms')
+const Path = require('path')
 const chalk = require('chalk')
 const minimist = require('minimist')
 const manifest = require('../package')
@@ -58,7 +59,7 @@ if (parameters.v) {
       return
     }
     if (!progress) {
-      progress = new ProgressBar(`  Downloading [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
+      progress = new ProgressBar(`  Downloading ${Path.basename(downloadInfo.filePath)} [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
         complete: '=',
         incomplete: '_',
         width: 50,
