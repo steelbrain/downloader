@@ -3,7 +3,7 @@
 import FS from 'fs'
 import Path from 'path'
 import invariant from 'assert'
-import request from 'request'
+import requestVanilla from 'request'
 import promisify from 'sb-promisify'
 import type { RangeWorker } from 'range-pool'
 import type { DownloadConfig, DownloadJob } from './types'
@@ -62,17 +62,22 @@ export function fillConfig(config: DownloadConfig): DownloadJob {
   return toReturn
 }
 
-export function promisedRequest(options: Object): Promise<Object> {
+export function request(options: Object): Promise<Object> {
   return new Promise(function(resolve, reject) {
-    const job = request(options)
+    const job = requestVanilla(options)
     job.on('error', reject)
     job.on('response', resolve)
     job.pause()
   })
 }
 
-export function getRange(worker: RangeWorker): ?string {
-  return worker.getCurrentIndex() + '-' + worker.getIndexLimit()
+export function getRangeHeader(worker: RangeWorker): ?string {
+  let range = worker.getCurrentIndex() + '-'
+  const limit = worker.getLimitIndex()
+  if (limit !== Infinity) {
+    range += limit
+  }
+  return `bytes=${range}`
 }
 
 export const open = promisify(FS.open)
