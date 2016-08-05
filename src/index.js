@@ -1,10 +1,10 @@
-'use strict'
-
 /* @flow */
 
-import {Download} from './download'
-import type {Downloader$Job} from './types'
+import Download from './download'
+import type { DownloadConfig } from './types'
 
-export function download(options: Downloader$Job): Download {
+export default function download(options: DownloadConfig): Download {
   return new Download(options)
 }
+
+export { download, Download }

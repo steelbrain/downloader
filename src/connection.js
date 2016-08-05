@@ -1,123 +1,128 @@
-'use strict'
-
 /* @flow */
 
 import FS from 'fs'
-import URL from 'url'
 import Path from 'path'
-import ZLIB from 'zlib'
-import {Emitter} from 'sb-event-kit'
-import promisify from 'sb-promisify'
-import {promisedRequest, getRange} from './helpers'
-import type {Disposable} from 'sb-event-kit'
-import type {RangePool, PoolWorker} from 'range-pool'
+import zlib from 'zlib'
+import { CompositeDisposable, Emitter } from 'sb-event-kit'
+import type { Disposable } from 'sb-event-kit'
+import type { RangeWorker } from 'range-pool'
+import { request, getRangeHeader } from './helpers'
 
-const inflate = promisify(ZLIB.inflate)
-const unzip = promisify(ZLIB.unzip)
+const FILENAME_HEADER_REGEX = /filename=("([\S ]+)"|([\S]+))/
 
-export class Connection {
+export default class Connection {
+  fd: Promise<number>;
   url: string;
-  pool: RangePool;
-  worker: PoolWorker;
-  headers: Object;
+  worker: RangeWorker;
+  attach: ((fd: number | Promise<number>) => void);
+  socket: ?Object;
   emitter: Emitter;
-  started: boolean;
-  encoding: 'gzip' | 'deflate' | 'none';
-  fileInfo: {
-    size: number
-  };
-  response: Object;
-  supportsResume: boolean;
+  headers: Object;
+  subscriptions: CompositeDisposable;
 
-  constructor(url: string, headers: Object, pool: RangePool) {
-    this.url = url
-    this.pool = pool
-    this.headers = headers
-    this.started = false
-    this.emitter = new Emitter()
-    this.encoding = 'none'
-    this.fileInfo = { size: 0 }
-    this.supportsResume = true
-  }
-  async activate(): Promise<Connection> {
-    if (this.started) {
-      return ;
-    }
-
-    this.worker = this.pool.createWorker()
-    this.started = true
-    const range = getRange(this.worker)
-
-    this.headers['User-Agent'] = 'sb-downloader for Node.js'
-    this.headers['Range'] = range
-    this.headers['Accept-Encoding'] = 'gzip, deflate'
-    this.response = await promisedRequest({
-      url: this.url,
-      headers: this.headers
+  constructor(url: string, headers: Object, worker: RangeWorker) {
+    this.fd = new Promise(resolve => {
+      this.attach = resolve
     })
-    this.fileInfo.size = parseInt(this.response.headers['content-length']) || 0
-    this.supportsResume = range === null || this.response.statusCode === 206
-    const encoding = (this.response.headers['content-encoding'] || '').toLowerCase()
-    if (encoding == 'deflate' || encoding === 'gzip') {
-      this.encoding = encoding
-    }
-    return this
-  }
-  start(fd: number) {
-    const _this = this
-    this.response.on('data', async function(chunkRaw) {
-      const remaining = _this.worker.getRemaining()
-      const shouldClose = remaining <= chunkRaw.length
-      let chunkLength = chunkRaw.length
-      if (chunkLength > remaining) {
-        chunkRaw = chunkRaw.slice(0, remaining)
-        chunkLength = chunkRaw.length
-      }
-      let chunk = chunkRaw
-      if (_this.encoding === 'deflate') {
-        chunk = await inflate(chunk)
-      } else if (_this.encoding === 'gzip') {
-        chunk = await unzip(chunk)
-      }
+    this.url = url
+    this.worker = worker
+    this.socket = null
+    this.emitter = new Emitter()
+    this.headers = headers
+    this.subscriptions = new CompositeDisposable()
 
-      FS.write(fd, chunk, 0, chunk.length, _this.worker.getCurrentIndex(), function(error) {
-        if (error) {
-          _this.emitter.emit('did-error', error)
+    this.subscriptions.add(this.emitter)
+  }
+  async request(): Promise<{ fileSize: number, fileName: ?string, supportsResume: boolean, contentEncoding: 'none' | 'deflate' | 'gzip' }> {
+    if (this.socket) {
+      this.socket.destroy()
+    }
+
+    const response = this.socket = await request({
+      url: this.url,
+      headers: Object.assign({}, this.headers, {
+        'User-Agent': 'sb-downloader for Node.js',
+        Range: getRangeHeader(this.worker),
+        'Accept-Encoding': 'gzip, deflate',
+      }),
+    })
+    if (response.statusCode > 299 && response.statusCode < 200) {
+      // Non 2xx status code
+      throw new Error(`Received non-success http code '${response.statusCode}'`)
+    }
+
+    let stream = response
+    const fileSize = parseInt(response.headers['content-length'], 10) || Infinity
+    const supportsResume = (response.headers['accept-ranges'] || '').toLowerCase().indexOf('bytes') !== -1
+    const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase()
+    let fileName = null
+    if ({}.hasOwnProperty.call(response.headers, 'content-disposition') && FILENAME_HEADER_REGEX.test(response.headers['content-disposition'])) {
+      const matches = FILENAME_HEADER_REGEX.exec(response.headers['content-disposition'])
+      fileName = matches[2] || matches[3]
+    } else {
+      const baseName = Path.basename(response.req.path.split('?')[0])
+      if (Path.extname(baseName)) {
+        fileName = baseName
+      }
+    }
+
+    if (contentEncoding === 'deflate') {
+      stream = stream.pipe(zlib.createInflate())
+    } else if (contentEncoding === 'gzip') {
+      stream = stream.pipe(zlib.createUnzip())
+    }
+
+    this.fd.then(fd => {
+      let lastPercentage = -1
+      stream.on('data', givenChunk => {
+        let chunk = givenChunk
+        const remaining = this.worker.getRemaining()
+        if (chunk.length > remaining) {
+          chunk = chunk.slice(0, remaining)
+        }
+
+        FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), function(error) {
+          if (error) {
+            this.emitter.emit('did-error', error)
+          }
+        })
+        this.worker.advance(chunk.length)
+        const newPercentage = this.worker.getCompletionPercentage()
+        if (newPercentage !== lastPercentage) {
+          lastPercentage = newPercentage
+          this.emitter.emit('did-progress', newPercentage)
+        }
+        if (remaining <= chunk.length) {
+          this.emitter.emit('did-finish')
+          this.dispose()
         }
       })
-      _this.worker.advance(chunkLength)
-      _this.emitter.emit('did-progress', _this.worker.getCompletionPercentage())
-      if (shouldClose) {
-        _this.emitter.emit('did-close')
-        _this.dispose()
-      }
+      stream.resume()
+    }).catch(error => {
+      this.emitter.emit('did-error', error)
     })
-    this.response.resume()
+
+    return {
+      fileSize,
+      fileName,
+      supportsResume,
+      contentEncoding,
+    }
   }
-  getFileSize(): number {
-    return this.fileInfo.size
-  }
-  getFileName(): string {
-    const parsed = URL.parse(this.url, true)
-    return Path.basename(parsed.pathname || '')
-  }
-  onDidClose(callback: Function): Disposable {
-    return this.emitter.on('did-close', callback)
-  }
-  onDidProgress(callback: Function): Disposable {
-    return this.emitter.on('did-progress', callback)
-  }
-  onDidError(callback: Function): Disposable {
+  onDidError(callback: ((error: Error) => any)): Disposable {
     return this.emitter.on('did-error', callback)
   }
+  onDidFinish(callback: (() => any)): Disposable {
+    return this.emitter.on('did-finish', callback)
+  }
+  onDidProgress(callback: (() => any)): Disposable {
+    return this.emitter.on('did-progress', callback)
+  }
   dispose() {
-    this.emitter.dispose()
-    if (this.worker) {
-      this.worker.dispose()
+    if (this.socket) {
+      this.socket.destroy()
     }
-    if (this.response) {
-      this.response.destroy()
-    }
-    this.started = false
+    this.worker.dispose()
+    this.subscriptions.dispose()
   }
 }
