@@ -34,18 +34,26 @@ export default class Download {
       Path.resolve(this.options.output.directory, this.options.output.file || fileInfo.fileName || 'download-' + (++downloadCount))
 
     let connections = 1
-    const fdPromise = open(filePath, 'w')
 
     if (fileInfo.supportsResume && Number.isFinite(fileInfo.fileSize)) {
       // Clear previous connection
       this.connections.delete(connection)
       connection.dispose()
 
-      const fd = await fdPromise
       const manifest = await Manifest.create(this.options.url, filePath, fileInfo.fileSize)
       const promises = []
 
       this.pool = manifest.data.pool
+      if (this.pool.hasCompleted()) {
+        process.nextTick(() => {
+          this.emitter.emit('did-progress', 100)
+          this.emitter.emit('did-complete')
+        })
+        this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections })
+        return
+      }
+
+      const fd = await open(filePath, 'w')
       for (let i = 0; i < this.options.connections; ++i) {
         const entry = this.getConnection()
         entry.attach(fd)
@@ -66,7 +74,7 @@ export default class Download {
     } else {
       this.pool.length = fileInfo.fileName
       connection.worker.limitIndex = fileInfo.fileSize
-      connection.attach(await fdPromise)
+      connection.attach(await open(filePath, 'w'))
     }
 
     this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections })
