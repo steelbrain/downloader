@@ -7,7 +7,7 @@ import ZLIB from 'zlib'
 import { Emitter } from 'sb-event-kit'
 import promisify from 'sb-promisify'
 import type { Disposable } from 'sb-event-kit'
-import type { RangePool, RangeWorker } from 'range-pool'
+import type { RangeWorker } from 'range-pool'
 import { promisedRequest, getRange } from './helpers'
 
 const inflate = promisify(ZLIB.inflate)
@@ -15,7 +15,6 @@ const unzip = promisify(ZLIB.unzip)
 
 export default class Connection {
   url: string;
-  pool: RangePool;
   worker: RangeWorker;
   headers: Object;
   emitter: Emitter;
@@ -27,9 +26,9 @@ export default class Connection {
   response: Object;
   supportsResume: boolean;
 
-  constructor(url: string, headers: Object, pool: RangePool) {
+  constructor(url: string, headers: Object, worker: RangeWorker) {
     this.url = url
-    this.pool = pool
+    this.worker = worker
     this.headers = headers
     this.started = false
     this.emitter = new Emitter()
@@ -42,18 +41,16 @@ export default class Connection {
       return this
     }
 
-    this.worker = this.pool.createWorker()
     this.started = true
     const range = getRange(this.worker)
 
-    Object.assign(this.headers, {
-      'User-Agent': 'sb-downloader for Node.js',
-      Range: range,
-      'Accept-Encoding': 'gzip, deflate',
-    })
     this.response = await promisedRequest({
       url: this.url,
-      headers: this.headers,
+      headers: Object.assign({}, this.headers, {
+        'User-Agent': 'sb-downloader for Node.js',
+        Range: range,
+        'Accept-Encoding': 'gzip, deflate',
+      }),
     })
     this.fileInfo.size = parseInt(this.response.headers['content-length'], 10) || 0
     this.supportsResume = range === null || this.response.statusCode === 206

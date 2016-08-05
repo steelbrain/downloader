@@ -11,19 +11,19 @@ import type { DownloadConfig, DownloadJob } from './types'
 let downloadCount = 0
 
 export default class Download {
-  options: DownloadJob;
-  subscriptions: CompositeDisposable;
-  emitter: Emitter;
-  connections: Set<Connection>;
   pool: RangePool;
+  emitter: Emitter;
+  options: DownloadJob;
+  connections: Set<Connection>;
+  subscriptions: CompositeDisposable;
   lastPercentage: number;
 
   constructor(options: DownloadConfig) {
-    this.subscriptions = new CompositeDisposable()
+    this.pool = new RangePool(Infinity)
     this.emitter = new Emitter()
-    this.connections = new Set()
-    this.pool = new RangePool(1024 * 1024 * 1024)
     this.options = fillConfig(options)
+    this.connections = new Set()
+    this.subscriptions = new CompositeDisposable()
     this.lastPercentage = -1
   }
   async start(): Promise<void> {
@@ -66,7 +66,7 @@ export default class Download {
     this.subscriptions.dispose()
   }
   getConnection(): Connection {
-    const connection = new Connection(this.options.url, Object.assign({}, this.options.headers), this.pool)
+    const connection = new Connection(this.options.url, this.options.headers, this.pool.getWorker())
     this.connections.add(connection)
     return connection
   }
