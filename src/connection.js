@@ -1,6 +1,7 @@
 /* @flow */
 
 import FS from 'fs'
+import Path from 'path'
 import zlib from 'zlib'
 import { CompositeDisposable, Emitter } from 'sb-event-kit'
 import type { Disposable } from 'sb-event-kit'
@@ -58,6 +59,11 @@ export default class Connection {
     if ({}.hasOwnProperty.call(response.headers, 'content-disposition') && FILENAME_HEADER_REGEX.test(response.headers['content-disposition'])) {
       const matches = FILENAME_HEADER_REGEX.exec(response.headers['content-disposition'])
       fileName = matches[2] || matches[3]
+    } else {
+      const baseName = Path.basename(response.req.path.split('?')[0])
+      if (Path.extname(baseName)) {
+        fileName = baseName
+      }
     }
 
     if (contentEncoding === 'deflate') {
