@@ -13,7 +13,7 @@ export default class Connection {
   fd: Promise<number>;
   url: string;
   worker: RangeWorker;
-  attach: ((fd: number) => void);
+  attach: ((fd: number | Promise<number>) => void);
   socket: ?Object;
   emitter: Emitter;
   headers: Object;
