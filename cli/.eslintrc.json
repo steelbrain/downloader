@@ -1,0 +1,9 @@
+{
+  "parserOptions": {
+    "sourceType": "script",
+    "ecmaVersion": "5"
+  },
+  "rules": {
+    "object-shorthand": 0
+  }
+}

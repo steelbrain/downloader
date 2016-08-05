@@ -1,31 +1,32 @@
 #!/usr/bin/env node
 'use strict'
 
-const Downloader = require('../')
-const ProgressBar = require('progress')
-const minimist = require('minimist')
-const fileSize = require('filesize')
-const chalk = require('chalk')
 const ms = require('ms')
+const chalk = require('chalk')
+const minimist = require('minimist')
+const manifest = require('../package')
+const fileSize = require('filesize')
+const ProgressBar = require('progress')
+const Downloader = require('../')
 const parameters = minimist(process.argv.slice(2))
 
 process.on('uncaughtException', function(error) {
-  console.error(error && error.stack || error)
+  console.error((error && error.stack) || error)
 })
 process.on('unhandledRejection', function(reason, promise) {
   console.error('Unhandled Rejection at: Promise ', promise, ' reason: ', reason)
 })
 
 if (parameters.v) {
-  console.log('sb-downloader: version', require('../package.json').version)
-} else if (parameters.h || parameters['_'].length < 1 || parameters['_'].length > 2) {
+  console.log('sb-downloader: version', manifest.version)
+} else if (parameters.h || parameters._.length < 1 || parameters._.length > 2) {
   console.error('Usage:\n\t$ download url [filePath] [--max-connections=4] [-H "Key: Value"]')
 } else {
-  const url = parameters['_'][0]
-  const rawHeaders = [].concat(parameters['H'] || [])
+  const url = parameters._[0]
+  const rawHeaders = [].concat(parameters.H || [])
   const headers = {}
-  const filePath = parameters['_'][1] || null
-  const maxConnections = parseInt(parameters['max-connections']) || 4
+  const filePath = parameters._[1] || null
+  const maxConnections = parseInt(parameters['max-connections'], 10) || 4
   let downloadInfo = {}
 
   rawHeaders.forEach(function(header) {
@@ -36,15 +37,15 @@ if (parameters.v) {
   })
   const download = Downloader.download({
     url: url,
-    target: {
+    output: {
       directory: process.cwd(),
-      file: filePath
+      file: filePath,
     },
     connections: maxConnections,
-    headers: headers
+    headers: headers,
   })
   download.onDidError(function(error) {
-    console.error('Download Error', error.stack || error)
+    console.error('Download Error', (error && error.stack) || error)
   })
   download.onDidStart(function(info) {
     downloadInfo = info
@@ -52,21 +53,21 @@ if (parameters.v) {
 
   let progress = null
   let lastCompleted = 0
-  download.onDidProgress(function(info) {
+  download.onDidProgress(function() {
     if (!downloadInfo.filePath) {
-      return ;
+      return
     }
     if (!progress) {
-      progress = new  ProgressBar(`  Downloading [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
+      progress = new ProgressBar(`  Downloading [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
         complete: '=',
         incomplete: '_',
         width: 50,
-        total: Math.round(info.maximum / 1024)
+        total: Math.ceil(download.pool.length / 1024),
       })
     }
-    info.completed = Math.round(info.completed / 1024)
-    progress.tick(info.completed - lastCompleted)
-    lastCompleted = info.completed
+    const newCompleted = Math.round(download.pool.getCompleted() / 1024)
+    progress.tick(newCompleted - lastCompleted)
+    lastCompleted = newCompleted
   })
   download.onDidComplete(function() {
     const timeTaken = process.uptime()
