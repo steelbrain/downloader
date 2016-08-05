@@ -1,7 +1,6 @@
 /* @flow */
 
 import FS from 'fs'
-import Path from 'path'
 import zlib from 'zlib'
 import { CompositeDisposable, Emitter } from 'sb-event-kit'
 import type { Disposable } from 'sb-event-kit'
@@ -33,7 +32,7 @@ export default class Connection {
 
     this.subscriptions.add(this.emitter)
   }
-  async request(): Promise<{ fileSize: number, fileName: string, supportsResume: boolean, contentEncoding: 'none' | 'deflate' | 'gzip' }> {
+  async request(): Promise<{ fileSize: number, fileName: ?string, supportsResume: boolean, contentEncoding: 'none' | 'deflate' | 'gzip' }> {
     if (this.socket) {
       this.socket.close()
     }
@@ -52,12 +51,12 @@ export default class Connection {
     }
 
     let stream = response
-    const fileSize = parseInt(response.headers['content-length'], 10) || 0
+    const fileSize = parseInt(response.headers['content-length'], 10) || Infinity
     const supportsResume = (response.headers['accept-ranges'] || '').toLowercase().indexOf('bytes') !== -1
     const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase()
     const fileName = {}.hasOwnProperty.call(response.headers, 'content-disposition') && FILENAME_HEADER_REGEX.test(response.headers['content-disposition']) ?
       FILENAME_HEADER_REGEX.exec(response.headers['content-disposition'])[2] :
-      Path.basename(response.req.path.split('?')[0])
+      null
 
     if (contentEncoding === 'deflate') {
       stream = stream.pipe(zlib.createInflate())
@@ -103,6 +102,9 @@ export default class Connection {
   }
   onDidFinish(callback: (() => any)): Disposable {
     return this.emitter.on('did-finish', callback)
+  }
+  onDidProgress(callback: (() => any)): Disposable {
+    return this.emitter.on('did-progress', callback)
   }
   dispose() {
     if (this.socket) {

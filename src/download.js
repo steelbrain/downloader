@@ -27,28 +27,32 @@ export default class Download {
     this.lastPercentage = -1
   }
   async start(): Promise<void> {
-    const connection = await this.getConnection().activate()
+    const connection = this.getConnection()
+    const fileInfo = await connection.request()
     const filePath = Path.isAbsolute(this.options.output.file || '') ?
       this.options.output.file :
-      Path.join(this.options.output.directory, this.options.output.file || connection.getFileName() || 'download-' + (++downloadCount))
-    const fileInfo = {
-      path: filePath,
-      size: connection.getFileSize(),
+      Path.join(this.options.output.directory, this.options.output.file || fileInfo.fileName || 'download-' + (++downloadCount))
+
+    let connections = 1
+    const fd = await open(filePath, 'w')
+
+    this.pool.length = fileInfo.fileName
+    connection.worker.limitIndex = fileInfo.fileSize
+    connection.attach(fd)
+
+    if (fileInfo.supportsResume && Number.isFinite(fileInfo.fileSize)) {
+      const promises = []
+      for (let i = 1; i < this.options.connections; ++i) {
+        const entry = this.getConnection()
+        entry.attach(fd)
+        promises.push(entry.request())
+        connections++
+      }
+
+      await Promise.all(promises)
     }
-    const fd = await open(fileInfo.path, 'w')
 
-    this.pool.length = fileInfo.size
-    connection.worker.limitIndex = fileInfo.size
-    this.handleConnection(fd, 0, connection)
-
-    const promises = []
-    for (let i = 1; i < this.options.connections; ++i) {
-      promises.push(this.handleConnection(fd, i, this.getConnection(i)))
-    }
-
-    await Promise.all(promises)
-
-    this.emitter.emit('did-start', { fileSize: fileInfo.size, filePath: fileInfo.path, url: this.options.url })
+    this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections })
   }
   onDidError(callback: ((error: Error) => void)): Disposable {
     return this.emitter.on('did-error', callback)
@@ -63,47 +67,36 @@ export default class Download {
     return this.emitter.on('did-complete', callback)
   }
   dispose() {
+    this.connections.forEach(connection => {
+      connection.dispose()
+    })
     this.subscriptions.dispose()
   }
   getConnection(): Connection {
+    let errorCount = 0
+
     const connection = new Connection(this.options.url, this.options.headers, this.pool.getWorker())
+    const onError = error => {
+      errorCount++
+      this.emitter.emit('did-error', error)
+      if (errorCount >= 20) {
+        // Abort entire download after 20 errors
+        this.dispose()
+      }
+      if (!connection.worker.hasCompleted()) {
+        connection.request().catch(onError)
+      }
+    }
+    connection.onDidError(onError)
+    connection.onDidProgress(() => {
+      this.emitter.emit('did-progress', this.pool.getCompletionPercentage())
+    })
+    connection.onDidFinish(() => {
+      if (this.pool.hasCompleted()) {
+        this.emitter.emit('did-complete')
+      }
+    })
     this.connections.add(connection)
     return connection
-  }
-  async handleConnection(fd: number, index: number, connection: Connection, givenKeepRunning: boolean = true): Promise<void> {
-    let keepRunning = givenKeepRunning
-    if (!keepRunning || this.pool.hasCompleted() || (this.pool.hasWorkingWorker() && this.pool.getRemaining() < 2 * 1024 * 1024)) {
-      connection.dispose()
-      return
-    }
-    connection.onDidClose(() => {
-      keepRunning = keepRunning && (connection.supportsResume || index === 0)
-
-      connection.dispose()
-      if (!this.pool.hasCompleted()) {
-        this.handleConnection(fd, index, this.getConnection(), keepRunning)
-      }
-    })
-    connection.onDidError(e => {
-      keepRunning = keepRunning && (connection.supportsResume || index === 0)
-
-      this.emitter.emit('did-error', e)
-      connection.dispose()
-      if (!this.pool.hasCompleted()) {
-        this.handleConnection(fd, index, this.getConnection(), keepRunning)
-      }
-    })
-    connection.onDidProgress(() => {
-      const percentage = Math.round((this.pool.getCompletedSteps() / this.pool.length) * 100)
-      if (percentage !== this.lastPercentage) {
-        this.lastPercentage = percentage
-        this.emitter.emit('did-progress', { percentage, completed: this.pool.getCompletedSteps(), maximum: this.pool.length })
-        if (percentage === 100) {
-          this.emitter.emit('did-complete')
-        }
-      }
-    })
-    await connection.activate()
-    connection.start(fd)
   }
 }
