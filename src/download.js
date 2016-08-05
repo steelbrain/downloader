@@ -65,11 +65,17 @@ export default class Download {
       this.onDidComplete(async function() {
         await manifest.delete()
       })
+      const exitHandler = () => {
+        manifest.writeSync()
+        this.dispose()
+      }
+      process.on('SIGINT', exitHandler)
       const updateInterval = setInterval(function() {
         manifest.write()
       }, 5000)
       this.subscriptions.add(new Disposable(function() {
         clearInterval(updateInterval)
+        process.removeListener('SIGINT', exitHandler)
       }))
     } else {
       this.pool.length = fileInfo.fileName

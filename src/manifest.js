@@ -1,5 +1,6 @@
 /* @flow */
 
+import FS from 'fs'
 import RangePool from 'range-pool'
 import { exists, unlink, readFile, writeFile } from './helpers'
 
@@ -46,6 +47,13 @@ export default class Manifest {
   }
   async write() {
     await writeFile(this.path, JSON.stringify({
+      url: this.url,
+      pool: this.data.pool.serialize(),
+      fileSize: this.fileSize,
+    }))
+  }
+  writeSync() {
+    FS.writeFileSync(this.path, JSON.stringify({
       url: this.url,
       pool: this.data.pool.serialize(),
       fileSize: this.fileSize,
