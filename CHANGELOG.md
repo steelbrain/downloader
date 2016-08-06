@@ -1,4 +1,4 @@
-## Upcoming
+## 2.0.2
 
 - Improve fix from v2.0.1
 - Fix support for deflate and gzip content encodings
