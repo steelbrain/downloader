@@ -1,3 +1,8 @@
+## Upcoming
+
+- More bugfixes
+- Update the progress bar more often (to add a *cool* psychological effect)
+
 ## 2.0.1
 
 - Fix a bug where new workers would not be spawned after one finishes it's task

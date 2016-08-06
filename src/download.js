@@ -125,8 +125,11 @@ export default class Download {
     connection.onDidFinish(() => {
       if (this.pool.hasCompleted()) {
         this.emitter.emit('did-complete')
+        this.dispose()
       } else if (!this.pool.hasAliveWorker() || this.pool.getRemaining() > 1024) {
-        this.getConnection().attach(connection.fd)
+        const anotherConnection = this.getConnection()
+        anotherConnection.attach(connection.fd)
+        anotherConnection.request().catch(onError)
       }
     })
     this.connections.add(connection)

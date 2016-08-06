@@ -73,7 +73,6 @@ export default class Connection {
     }
 
     this.fd.then(fd => {
-      let lastPercentage = -1
       stream.on('data', givenChunk => {
         let chunk = givenChunk
         const remaining = this.worker.getRemaining()
@@ -87,11 +86,7 @@ export default class Connection {
           }
         })
         this.worker.advance(chunk.length)
-        const newPercentage = this.worker.getCompletionPercentage()
-        if (newPercentage !== lastPercentage) {
-          lastPercentage = newPercentage
-          this.emitter.emit('did-progress', newPercentage)
-        }
+        this.emitter.emit('did-progress', this.worker.getCompletionPercentage())
         if (remaining <= chunk.length) {
           this.emitter.emit('did-finish')
           this.dispose()
