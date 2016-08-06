@@ -1,5 +1,6 @@
 ## Upcoming
 
+- Improve fix from v2.0.1
 - Fix support for deflate and gzip content encodings
 - Update the progress bar more often (to add a *cool* psychological effect)
 - Fix a bug where download would get very slow at the end for large files
