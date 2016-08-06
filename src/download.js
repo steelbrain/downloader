@@ -53,7 +53,7 @@ export default class Download {
         return
       }
 
-      const fd = await open(filePath, 'w')
+      const fd = await open(filePath, 'a')
       for (let i = 0; i < this.options.connections; ++i) {
         const entry = this.getConnection()
         entry.attach(fd)
@@ -126,7 +126,7 @@ export default class Download {
       if (this.pool.hasCompleted()) {
         this.emitter.emit('did-complete')
         this.dispose()
-      } else if (!this.pool.hasAliveWorker() || this.pool.getRemaining() > 1024) {
+      } else if (!this.pool.hasAliveWorker() || this.pool.getRemaining() > (1024 * 1024)) {
         const anotherConnection = this.getConnection()
         anotherConnection.attach(connection.fd)
         anotherConnection.request().catch(onError)

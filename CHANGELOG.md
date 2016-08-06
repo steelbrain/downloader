@@ -2,6 +2,8 @@
 
 - More bugfixes
 - Update the progress bar more often (to add a *cool* psychological effect)
+- Fix a bug where download would get very slow at the end for large files
+- Fix a bug where downloads resumed after restarting the utility would be invalid
 
 ## 2.0.1
 
