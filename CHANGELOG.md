@@ -1,6 +1,6 @@
 ## Upcoming
 
-- More bugfixes
+- Fix support for deflate and gzip content encodings
 - Update the progress bar more often (to add a *cool* psychological effect)
 - Fix a bug where download would get very slow at the end for large files
 - Fix a bug where downloads resumed after restarting the utility would be invalid

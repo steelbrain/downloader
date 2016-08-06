@@ -2,12 +2,15 @@
 
 import FS from 'fs'
 import Path from 'path'
-import zlib from 'zlib'
+import ZLIB from 'zlib'
+import promisify from 'sb-promisify'
 import { CompositeDisposable, Emitter } from 'sb-event-kit'
 import type { Disposable } from 'sb-event-kit'
 import type { RangeWorker } from 'range-pool'
 import { request, getRangeHeader } from './helpers'
 
+const unzip = promisify(ZLIB.unzip)
+const deflate = promisify(ZLIB.deflate)
 const FILENAME_HEADER_REGEX = /filename=("([\S ]+)"|([\S]+))/
 
 export default class Connection {
@@ -42,8 +45,8 @@ export default class Connection {
       url: this.url,
       headers: Object.assign({}, this.headers, {
         'User-Agent': 'sb-downloader for Node.js',
-        Range: getRangeHeader(this.worker),
         'Accept-Encoding': 'gzip, deflate',
+        Range: getRangeHeader(this.worker),
       }),
     })
     if (response.statusCode > 299 && response.statusCode < 200) {
@@ -51,7 +54,6 @@ export default class Connection {
       throw new Error(`Received non-success http code '${response.statusCode}'`)
     }
 
-    let stream = response
     const fileSize = parseInt(response.headers['content-length'], 10) || Infinity
     const supportsResume = (response.headers['accept-ranges'] || '').toLowerCase().indexOf('bytes') !== -1
     const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase()
@@ -66,35 +68,39 @@ export default class Connection {
       }
     }
 
-    if (contentEncoding === 'deflate') {
-      stream = stream.pipe(zlib.createInflate())
-    } else if (contentEncoding === 'gzip') {
-      stream = stream.pipe(zlib.createUnzip())
-    }
-
     this.fd.then(fd => {
-      stream.on('data', givenChunk => {
+      const that = this
+      response.on('data', async givenChunk => {
         let chunk = givenChunk
         const remaining = this.worker.getRemaining()
         if (chunk.length > remaining) {
           chunk = chunk.slice(0, remaining)
         }
-
+        const chunkLength = chunk.length
+        try {
+          // NOTE: Writing these here instead of piping streams so we get correct chunkLength
+          if (contentEncoding === 'deflate') {
+            chunk = await deflate(chunk)
+          } else if (contentEncoding === 'gzip') {
+            chunk = await unzip(chunk)
+          }
+        } catch (error) {
+          this.emitter.emit('did-error', error)
+          this.dispose()
+        }
         FS.write(fd, chunk, 0, chunk.length, this.worker.getCurrentIndex(), function(error) {
           if (error) {
-            this.emitter.emit('did-error', error)
+            that.emitter.emit('did-error', error)
           }
         })
-        this.worker.advance(chunk.length)
+        this.worker.advance(chunkLength)
         this.emitter.emit('did-progress', this.worker.getCompletionPercentage())
-        if (remaining <= chunk.length) {
+        if (remaining <= chunkLength) {
           this.emitter.emit('did-finish')
           this.dispose()
         }
       })
-      stream.resume()
-    }).catch(error => {
-      this.emitter.emit('did-error', error)
+      response.resume()
     })
 
     return {
