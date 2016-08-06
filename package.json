@@ -1,6 +1,6 @@
 {
   "name": "sb-downloader",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A nice node.js multi-connection downloader",
   "main": "lib/index.js",
   "bin": {
