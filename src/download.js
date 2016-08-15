@@ -78,7 +78,7 @@ export default class Download {
         process.removeListener('SIGINT', exitHandler)
       }))
     } else {
-      this.pool.length = fileInfo.fileName
+      this.pool.length = fileInfo.fileSize
       connection.worker.limitIndex = fileInfo.fileSize
       connection.attach(await open(filePath, 'w'))
     }
