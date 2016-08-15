@@ -55,7 +55,7 @@ export default class Connection {
     }
 
     const fileSize = parseInt(response.headers['content-length'], 10) || Infinity
-    const supportsResume = (response.headers['accept-ranges'] || '').toLowerCase().indexOf('bytes') !== -1
+    const supportsResume = (response.headers['accept-ranges'] || '').toLowerCase().indexOf('bytes') !== -1 || {}.hasOwnProperty.call(response.headers, 'content-range')
     const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase()
     let fileName = null
     if ({}.hasOwnProperty.call(response.headers, 'content-disposition') && FILENAME_HEADER_REGEX.test(response.headers['content-disposition'])) {
