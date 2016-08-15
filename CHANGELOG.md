@@ -1,3 +1,8 @@
+## 2.0.3
+
+- Correct supportsResume detection
+- Fix file name guessing for when download is not resumable
+
 ## 2.0.2
 
 - Improve fix from v2.0.1
