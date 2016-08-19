@@ -1,3 +1,7 @@
+## 2.0.4
+
+- Change build toolchain from `ucompiler` to `babel-cli`
+
 ## 2.0.3
 
 - Correct supportsResume detection
