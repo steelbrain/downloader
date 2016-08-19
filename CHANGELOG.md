@@ -1,3 +1,7 @@
+## 2.0.5
+
+- Bump `range-pool` version to include bugfixes
+
 ## 2.0.4
 
 - Change build toolchain from `ucompiler` to `babel-cli`
