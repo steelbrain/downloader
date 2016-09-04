@@ -1,6 +1,7 @@
 ## 2.0.6
 
 - Fixed parsing of cli param `-H`
+- Fixed file size detection for some servers
 
 ## 2.0.5
 

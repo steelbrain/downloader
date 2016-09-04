@@ -54,7 +54,16 @@ export default class Connection {
       throw new Error(`Received non-success http code '${response.statusCode}'`)
     }
 
-    const fileSize = parseInt(response.headers['content-length'], 10) || Infinity
+    let fileSize = Infinity
+    if ({}.hasOwnProperty.call(response.headers, 'content-length')) {
+      fileSize = parseInt(response.headers['content-length'], 10) || fileSize
+    } else if ({}.hasOwnProperty.call(response.headers, 'content-range')) {
+      const range = response.headers['content-range']
+      const index = range.indexOf('/')
+      if (range.substr(0, 5) === 'bytes' && index !== -1) {
+        fileSize = parseInt(range.substr(index + 1), 10) || fileSize
+      }
+    }
     const supportsResume = (response.headers['accept-ranges'] || '').toLowerCase().indexOf('bytes') !== -1 || {}.hasOwnProperty.call(response.headers, 'content-range')
     const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase()
     let fileName = null
