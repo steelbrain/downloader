@@ -1,3 +1,7 @@
+## 2.0.6
+
+- Fixed parsing of cli param `-H`
+
 ## 2.0.5
 
 - Bump `range-pool` version to include bugfixes

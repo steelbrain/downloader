@@ -31,9 +31,9 @@ if (parameters.v) {
   let downloadInfo = {}
 
   rawHeaders.forEach(function(header) {
-    const chunks = header.split(':')
-    if (chunks.length === 2) {
-      headers[chunks[0].trim()] = chunks[1].trim()
+    const index = header.indexOf(':')
+    if (index !== -1) {
+      headers[header.substr(0, index).trim()] = header.substr(index + 1).trim()
     }
   })
   const download = Downloader.download({
