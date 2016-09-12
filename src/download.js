@@ -5,7 +5,7 @@ import { Emitter, CompositeDisposable, Disposable } from 'sb-event-kit'
 import RangePool from 'range-pool'
 import Manifest from './manifest'
 import Connection from './connection'
-import { open, fillConfig } from './helpers'
+import { open, fillConfig, getLaziestWorker } from './helpers'
 import type { DownloadConfig, DownloadJob } from './types'
 
 let downloadCount = 0
@@ -33,13 +33,9 @@ export default class Download {
       this.options.output.file :
       Path.resolve(this.options.output.directory, this.options.output.file || fileInfo.fileName || 'download-' + (++downloadCount))
 
-    let connections = 1
+    let spawnedConnections = 1
 
     if (fileInfo.supportsResume && Number.isFinite(fileInfo.fileSize)) {
-      // Clear previous connection
-      this.connections.delete(connection)
-      connection.dispose()
-
       const manifest = await Manifest.create(this.options.url, filePath, fileInfo.fileSize)
       const promises = []
 
@@ -49,16 +45,22 @@ export default class Download {
           this.emitter.emit('did-progress', 100)
           this.emitter.emit('did-complete')
         })
-        this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections })
+        this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections: this.pool.workers.size })
         return
       }
 
       const fd = await open(filePath, 'a')
-      for (let i = 0; i < this.options.connections; ++i) {
+      // Suggested max are length in MBs / 2
+      const suggestedMaxConnections = Math.floor(((fileInfo.fileSize / 1024) / 1024) / 2)
+      const maxConnections = Math.min(this.options.connections, suggestedMaxConnections)
+
+      connection.attach(fd)
+
+      for (let i = 1; i < maxConnections; ++i) {
         const entry = this.getConnection()
         entry.attach(fd)
         promises.push(entry.request())
-        connections++
+        spawnedConnections++
       }
 
       await Promise.all(promises)
@@ -83,7 +85,7 @@ export default class Download {
       connection.attach(await open(filePath, 'w'))
     }
 
-    this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections })
+    this.emitter.emit('did-start', { fileSize: fileInfo.fileSize, filePath, url: this.options.url, connections: spawnedConnections })
   }
   onDidError(callback: ((error: Error) => void)): Disposable {
     return this.emitter.on('did-error', callback)
@@ -126,7 +128,11 @@ export default class Download {
       if (this.pool.hasCompleted()) {
         this.emitter.emit('did-complete')
         this.dispose()
-      } else if (!this.pool.hasAliveWorker() || this.pool.getRemaining() > (1024 * 1024)) {
+      } else {
+        const laziestWorker = getLaziestWorker(this.pool)
+        if (laziestWorker.getRemaining() < (1024 * 1024 * 2)) {
+          return
+        }
         const anotherConnection = this.getConnection()
         anotherConnection.attach(connection.fd)
         anotherConnection.request().catch(onError)
