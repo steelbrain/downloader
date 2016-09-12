@@ -5,7 +5,7 @@ import Path from 'path'
 import invariant from 'assert'
 import requestVanilla from 'request'
 import promisify from 'sb-promisify'
-import type { RangeWorker } from 'range-pool'
+import type { RangePool, RangeWorker } from 'range-pool'
 import type { DownloadConfig, DownloadJob } from './types'
 
 export function fillConfig(config: DownloadConfig): DownloadJob {
@@ -80,6 +80,20 @@ export function getRangeHeader(worker: RangeWorker): ?string {
     range += limit
   }
   return `bytes=${range}`
+}
+
+export function getLaziestWorker(pool: RangePool): RangeWorker {
+  let lazyOne
+  for (const worker of pool.workers) {
+    if (!worker.getActive()) {
+      continue
+    }
+    if (!lazyOne || lazyOne.getRemaining() < worker.getRemaining()) {
+      lazyOne = worker
+    }
+  }
+  invariant(lazyOne, 'The range was already complete')
+  return lazyOne
 }
 
 export const open: ((filePath: string) => Promise<number>) = promisify(FS.open)

@@ -1,3 +1,10 @@
+## 2.0.7
+
+- Do not spawn more than 1 worker per 2 MBs
+- Reuse first connection instead of disposing it
+- Fixed how `should we spawn a new worker?` is determined
+- Fixed a bug where events would be fired with invalid number of connections
+
 ## 2.0.6
 
 - Fixed parsing of cli param `-H`
