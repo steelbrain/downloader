@@ -1,3 +1,7 @@
+## 2.1.0
+
+- Use `got` instead of `request` to reduce dep bloatware
+
 ## 2.0.7
 
 - Do not spawn more than 1 worker per 2 MBs

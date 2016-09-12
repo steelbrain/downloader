@@ -1,9 +1,9 @@
 /* @flow */
 
 import FS from 'fs'
+import got from 'got'
 import Path from 'path'
 import invariant from 'assert'
-import requestVanilla from 'request'
 import promisify from 'sb-promisify'
 import type { RangePool, RangeWorker } from 'range-pool'
 import type { DownloadConfig, DownloadJob } from './types'
@@ -64,11 +64,13 @@ export function fillConfig(config: DownloadConfig): DownloadJob {
   return toReturn
 }
 
-export function request(options: Object): Promise<Object> {
+export function request(url: string, options: Object): Promise<Object> {
   return new Promise(function(resolve, reject) {
-    const job = requestVanilla(options)
+    const job = got.stream(url, options)
     job.on('error', reject)
-    job.on('response', resolve)
+    job.on('response', function(response) {
+      resolve({ job, response })
+    })
     job.pause()
   })
 }

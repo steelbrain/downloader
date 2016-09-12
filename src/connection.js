@@ -41,14 +41,14 @@ export default class Connection {
       this.socket.destroy()
     }
 
-    const response = this.socket = await request({
-      url: this.url,
+    const { response, job } = await request(this.url, {
       headers: Object.assign({}, this.headers, {
         'User-Agent': 'sb-downloader for Node.js',
         'Accept-Encoding': 'gzip, deflate',
         Range: getRangeHeader(this.worker),
       }),
     })
+    this.socket = response
     if (response.statusCode > 299 && response.statusCode < 200) {
       // Non 2xx status code
       throw new Error(`Received non-success http code '${response.statusCode}'`)
@@ -79,7 +79,7 @@ export default class Connection {
 
     this.fd.then(fd => {
       const that = this
-      response.on('data', async givenChunk => {
+      job.on('data', async givenChunk => {
         let chunk = givenChunk
         const remaining = this.worker.getRemaining()
         if (chunk.length > remaining) {
@@ -109,7 +109,7 @@ export default class Connection {
           this.dispose()
         }
       })
-      response.resume()
+      job.resume()
     })
 
     return {
