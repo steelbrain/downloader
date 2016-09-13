@@ -36,6 +36,11 @@ export default class Download {
     let spawnedConnections = 1
 
     if (fileInfo.supportsResume && Number.isFinite(fileInfo.fileSize)) {
+      // NOTE: The reason we are disposing this connection is because
+      // The newly created PoolRange doesn't have it
+      this.connections.delete(connection)
+      connection.dispose()
+
       const manifest = await Manifest.create(this.options.url, filePath, fileInfo.fileSize)
       const promises = []
 
@@ -54,9 +59,8 @@ export default class Download {
       const suggestedMaxConnections = Math.floor(((fileInfo.fileSize / 1024) / 1024) / 2)
       const maxConnections = Math.min(this.options.connections, suggestedMaxConnections)
 
-      connection.attach(fd)
-
-      for (let i = 1; i < maxConnections; ++i) {
+      spawnedConnections = 0
+      for (let i = 0; i < maxConnections; ++i) {
         const entry = this.getConnection()
         entry.attach(fd)
         promises.push(entry.request())

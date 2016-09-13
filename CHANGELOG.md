@@ -1,3 +1,7 @@
+## 2.1.1
+
+- Fix a bug introduced in 2.0.7 where some files would not be downloaded properly
+
 ## 2.1.0
 
 - Use `got` instead of `request` to reduce dep bloatware
