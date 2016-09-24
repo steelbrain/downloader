@@ -29,9 +29,7 @@ export default class Download {
   async start(): Promise<void> {
     const connection = this.getConnection()
     const fileInfo = await connection.request()
-    const filePath = this.options.output.file && Path.isAbsolute(this.options.output.file) ?
-      this.options.output.file :
-      Path.resolve(this.options.output.directory, this.options.output.file || fileInfo.fileName || 'download-' + (++downloadCount))
+    const filePath = Path.resolve(this.options.output.directory, this.options.output.file || fileInfo.fileName || 'download-' + (++downloadCount))
 
     let spawnedConnections = 1
 
