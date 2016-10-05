@@ -77,10 +77,10 @@ export default class Download {
       const updateInterval = setInterval(function() {
         manifest.write()
       }, 5000)
-      this.subscriptions.add(new Disposable(function() {
+      this.subscriptions.add(function() {
         clearInterval(updateInterval)
         process.removeListener('SIGINT', exitHandler)
-      }))
+      })
     } else {
       this.pool.length = fileInfo.fileSize
       connection.worker.limitIndex = fileInfo.fileSize
