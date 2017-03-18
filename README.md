@@ -1,5 +1,7 @@
 # Downloader
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/steelbrain/downloader.svg)](https://greenkeeper.io/)
+
 Downloader is an efficient, multi-connection downloader written in Node.js. By downloading the same file over multiple connections, it can double or triple the speed for high latency users.
 
 ## Installation
