@@ -1,10 +1,18 @@
 /* @flow */
 
-import Download from './download'
+import * as Helpers from './helpers'
 import type { DownloadConfig } from './types'
 
-export default function download(options: DownloadConfig): Download {
-  return new Download(options)
+class Download {
+  options: DownloadConfig;
+  constructor(options: DownloadConfig) {
+    this.options = Helpers.fillOptions(options)
+  }
 }
 
-export { download, Download }
+function download(config: DownloadConfig): Download {
+  return new Download(config)
+}
+
+export { Download, download }
+export default download

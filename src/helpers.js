@@ -1,105 +1,35 @@
 /* @flow */
 
-import FS from 'fs'
-import got from 'got'
-import Path from 'path'
 import invariant from 'assert'
-import promisify from 'sb-promisify'
-import type { RangePool, RangeWorker } from 'range-pool'
-import type { DownloadConfig, DownloadJob } from './types'
+import cloneDeep from 'lodash.clonedeep'
+import type { DownloadConfig } from './types'
 
-export function fillConfig(config: DownloadConfig): DownloadJob {
-  const toReturn = {}
-  invariant(typeof config.url === 'string' && config.url, 'config.url must be a string')
-  toReturn.url = config.url
+/* eslint-disable prefer-const */
+export function fillOptions(given: Object): DownloadConfig {
+  invariant(given && typeof given === 'object', 'options must be a valid object')
 
-  if (typeof config.output === 'object' && config.output) {
-    invariant(typeof config.output.directory === 'string' && config.output.directory, 'config.output.directory must be a string')
-    if (config.output.file) {
-      invariant(typeof config.output.file === 'string', 'config.output.file must be null or a string')
-    }
-    toReturn.output = {
-      file: config.output.file || null,
-      directory: config.output.directory,
-    }
-  } else if (typeof config.output === 'string' && config.output) {
-    const filePath = Path.resolve(config.output)
-    toReturn.output = {
-      file: Path.basename(filePath),
-      directory: Path.dirname(filePath),
-    }
+  let { url, output, headers, connections } = cloneDeep(given)
+
+  invariant(url && typeof url === 'string', 'options.url must be a valid string')
+  invariant(output && typeof output === 'object', 'options.output must be a valid object')
+  invariant(output.directory && typeof output.directory === 'string', 'options.output.directory must be a valid path')
+  if (output.file) {
+    invariant(typeof output.file === 'string', 'options.output.file must be a valid path')
   } else {
-    throw new TypeError('config.output must be valid')
+    output.file = null
   }
 
-  toReturn.headers = {}
-  if (config.headers) {
-    invariant(typeof config.headers === 'object', 'config.headers must be an object')
-    for (const key in config.headers) {
-      if (!{}.hasOwnProperty.call(config.headers, key)) {
-        continue
-      }
-      // $FlowIgnore: Stupid flow, I already did hasOwnProperty check
-      const value = config.headers[key]
-      if (value) {
-        if (typeof value === 'number') {
-          toReturn.headers[key] = value.toString()
-        } else if (typeof value === 'string') {
-          toReturn.headers[key] = value
-        } else {
-          throw new TypeError(`config.headers has non literal value in '${key}'`)
-        }
-      }
-    }
-  }
-
-  if (config.connections) {
-    invariant(typeof config.connections === 'number', 'config.connections must be a number')
-    toReturn.connections = config.connections
+  if (headers) {
+    invariant(typeof headers === 'object', 'options.headers must be an object')
   } else {
-    toReturn.connections = 4
+    headers = {}
+  }
+  if (connections) {
+    invariant(typeof connections === 'number', 'options.connections must be a number')
+  } else {
+    connections = 4
   }
 
-  toReturn.range = null
-  return toReturn
+  return { url, output, headers, connections }
 }
-
-export function request(url: string, options: Object): Promise<Object> {
-  return new Promise(function(resolve, reject) {
-    const job = got.stream(url, options)
-    job.on('error', reject)
-    job.on('response', function(response) {
-      resolve({ job, response })
-    })
-    job.pause()
-  })
-}
-
-export function getRangeHeader(worker: RangeWorker): ?string {
-  let range = worker.getCurrentIndex() + '-'
-  const limit = worker.getLimitIndex()
-  if (limit !== Infinity) {
-    range += limit
-  }
-  return `bytes=${range}`
-}
-
-export function getLaziestWorker(pool: RangePool): RangeWorker {
-  let lazyOne
-  for (const worker of pool.workers) {
-    if (!worker.getActive()) {
-      continue
-    }
-    if (!lazyOne || lazyOne.getRemaining() < worker.getRemaining()) {
-      lazyOne = worker
-    }
-  }
-  invariant(lazyOne, 'The range was already complete')
-  return lazyOne
-}
-
-export const open: ((filePath: string) => Promise<number>) = promisify(FS.open)
-export const unlink: ((filePath: string) => Promise<void>) = promisify(FS.unlink)
-export const exists: ((filePath: string) => Promise<boolean>) = promisify(FS.access)
-export const readFile: ((filePath: string) => Promise<Buffer>) = promisify(FS.readFile)
-export const writeFile: ((filePath: string, contents: string) => Promise<Buffer>) = promisify(FS.writeFile)
+/* eslint-enable prefer-const */
