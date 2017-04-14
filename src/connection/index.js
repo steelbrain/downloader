@@ -1,6 +1,9 @@
 /* @flow */
 
+import FS from 'sb-fs'
+import { createInflate, createGunzip } from 'zlib'
 import { CompositeDisposable, Emitter } from 'sb-event-kit'
+import type { Disposable } from 'sb-event-kit'
 
 import * as Helpers from './helpers'
 import type { DownloadConfig } from '../types'
@@ -42,7 +45,7 @@ export default class Connection {
     if (this.worker.getCurrentIndex() > 0) {
       headers.Range = `bytes=${this.worker.getCurrentIndex()}-${this.worker.getLimitIndex()}`
     }
-    const { response, visitedUrls } = await Helpers.openConnection(this.options.url, {
+    const { request, response, visitedUrls } = await Helpers.openConnection(this.options.url, {
       headers: Object.assign({}, this.options.headers, headers),
     })
     if (response.statusCode > 299 && response.statusCode < 200) {
@@ -56,9 +59,31 @@ export default class Connection {
       this.contentEncoding = response.headers['content-encoding']
     }
     this.fileName = Helpers.guessFileName(this.visitedUrls.slice(), response.headers)
+
+    let chain = request.pipe(Helpers.getTransform(this, response, () => {
+      // TODO: Events
+      process.stdout.write(`\rtick callback: ${this.worker.getCompletionPercentage()}`)
+    }))
+    if (this.contentEncoding === 'deflate') {
+      chain = chain.pipe(createInflate())
+    } else if (this.contentEncoding === 'gzip') {
+      chain = chain.pipe(createGunzip())
+    }
+    chain = chain.pipe(FS.createWriteStream(this.filePath, {
+      flags: 'a',
+    }))
+    chain.on('error', (error) => {
+      this.emitter.emit('did-error', error)
+    })
+    response.resume()
   }
   async rename(filePath: string): Promise<void> {
-
+    const oldFilePath = this.filePath
+    this.filePath = filePath
+    await FS.rename(oldFilePath, `${filePath}.part-${this.worker.getMetadata().id}`)
+  }
+  onDidError(callback: ((error: Error) => any)): Disposable {
+    return this.emitter.on('did-error', callback)
   }
   dispose() {
     this.subscriptions.dispose()

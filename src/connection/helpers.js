@@ -1,7 +1,9 @@
 /* @flow */
 
 import got from 'got'
+import { Transform } from 'stream'
 import { posix as Path } from 'path'
+import type Connection from './'
 
 export function openConnection(url: string, options: Object): Promise<Object> {
   return new Promise(function(resolve, reject) {
@@ -48,4 +50,24 @@ export function guessFileName(visitedUrls: Array<string>, headers: Object): ?str
     }
   }
   return null
+}
+
+export function getTransform(connection: Connection, response: Object, tickCallback: (() => void)): Object {
+  const transform = new Transform()
+  // $FlowIgnore: Some type merge issues with flow
+  transform._transform = (givenChunk, encoding, callback) => { // eslint-disable-line no-underscore-dangle
+    if (!connection.status) {
+      response.destroy()
+    } else {
+      const remaining = connection.worker.getRemaining()
+      let chunk = givenChunk
+      if (chunk.length > remaining) {
+        chunk = chunk.slice(0, remaining)
+      }
+      connection.worker.advance(chunk.length)
+      tickCallback()
+      callback(null, chunk)
+    }
+  }
+  return transform
 }

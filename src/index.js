@@ -4,6 +4,7 @@ import Path from 'path'
 import invariant from 'assert'
 import { RangePool } from 'range-pool'
 import { CompositeDisposable, Emitter } from 'sb-event-kit'
+import type { Disposable } from 'sb-event-kit'
 
 import Connection from './connection'
 import * as Helpers from './helpers'
@@ -29,11 +30,20 @@ class Download {
   }
   async activate(): Promise<void> {
     const filenameIsTemporary = !this.options.output.file
-    const filename = filenameIsTemporary ? Path.join(this.options.output.directory, `download-${Helpers.getRandomString()}`) : this.options.output.file
+    let filename = filenameIsTemporary ? Path.join(this.options.output.directory, `download-${Helpers.getRandomString()}`) : this.options.output.file
     invariant(filename)
 
     const firstConnection = this.getConnection(filename)
+    await firstConnection.activate()
 
+    if (Number.isFinite(firstConnection.fileSize)) {
+      this.pool.length = firstConnection.fileSize
+      firstConnection.worker.limitIndex = firstConnection.fileSize
+    }
+    if (filenameIsTemporary && firstConnection.fileName) {
+      filename = firstConnection.fileName
+      await firstConnection.rename(filename)
+    }
   }
   getConnection(filePath: string): Connection {
     const poolWorker = this.pool.getWorker()
@@ -43,10 +53,16 @@ class Download {
     poolWorker.setMetadata({ id: poolWorkerId })
     this.pool.setMetadata(poolMetadata)
 
-    const connection = new Connection(this.options, poolWorker, `${filePath}.part-${poolWorkerId}`)
+    const connection = new Connection(poolWorker, this.options, `${filePath}.part-${poolWorkerId}`)
+    connection.onDidError((error) => {
+      this.emitter.emit('did-error', error)
+    })
     this.connections.add(connection)
 
     return connection
+  }
+  onDidError(callback: ((error: Error) => any)): Disposable {
+    return this.emitter.on('did-error', callback)
   }
   dispose() {
     // TODO: Save state here
