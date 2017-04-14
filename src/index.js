@@ -64,8 +64,10 @@ class Download {
         await FS.unlink(entry)
         await mergeNextFile()
       }
-      if (!await FS.exists(filePath) || await FS.exists(files[0])) {
+      if (await FS.exists(filePath) && await FS.exists(files[0])) {
         await FS.unlink(filePath)
+      }
+      if (await FS.exists(files[0])) {
         await mergeNextFile()
       }
       if (await FS.exists(`${filePath}.manifest`)) {
