@@ -52,10 +52,10 @@ export function getLaziestWorker(pool: Object): ?Object {
   return lazyWorker
 }
 
-export function getRangePool(length: number): Object {
+export function getRangePool(length: number, lastChunkId: number): Object {
   const pool = new RangePool(length)
   pool.setMetadata({
-    lastChunkId: 0,
+    lastChunkId,
   })
   return pool
 }

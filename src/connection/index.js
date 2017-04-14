@@ -9,33 +9,30 @@ import * as Helpers from './helpers'
 import type { DownloadConfig } from '../types'
 
 export default class Connection {
-  status: boolean;
   worker: Object;
   emitter: Emitter;
   options: DownloadConfig;
   filePath: string;
   fileSize: number;
+  complete: boolean;
   fileName: ?string;
   visitedUrls: Array<string>;
   subscriptions: CompositeDisposable;
   supportsResume: boolean;
   contentEncoding: ?string;
   constructor(worker: Object, options: DownloadConfig, filePath: string) {
-    this.status = true
     this.worker = worker
     this.emitter = new Emitter()
     this.options = options
     this.filePath = filePath
     this.fileSize = Infinity
+    this.complete = false
     this.visitedUrls = []
     this.subscriptions = new CompositeDisposable()
     this.supportsResume = false
     this.contentEncoding = null
 
     this.subscriptions.add(this.emitter)
-  }
-  abort(): void {
-    this.status = false
   }
   async activate(): Promise<void> {
     const headers: Object = {
@@ -60,9 +57,7 @@ export default class Connection {
     }
     this.fileName = Helpers.guessFileName(this.visitedUrls.slice(), response.headers)
 
-    let chain = request.pipe(Helpers.getTransform(this, response, () => {
-      this.emitter.emit('did-progress')
-    }))
+    let chain = request.pipe(Helpers.getTransform(this, response))
     if (this.contentEncoding === 'deflate') {
       chain = chain.pipe(createInflate())
     } else if (this.contentEncoding === 'gzip') {
@@ -71,18 +66,21 @@ export default class Connection {
     chain = chain.pipe(FS.createWriteStream(this.filePath, {
       flags: 'a',
     }))
-    chain.on('close', () => {
+    chain.on('close', async () => {
+      console.log('connection complete', this.worker.getMetadata().id)
+      this.complete = true
       this.emitter.emit('did-complete')
     }).on('error', (error) => {
+      console.log('error', error)
       this.emitter.emit('did-error', error)
+    }).on('data', () => {
+      this.emitter.emit('did-progress')
     })
     this.emitter.emit('did-connect')
+    this.subscriptions.add(function() {
+      response.destroy()
+    })
     response.resume()
-  }
-  async rename(filePath: string): Promise<void> {
-    const oldFilePath = this.filePath
-    this.filePath = `${filePath}.part-${this.worker.getMetadata().id}`
-    await FS.rename(oldFilePath, this.filePath)
   }
   onDidError(callback: ((error: Error) => any)): Disposable {
     return this.emitter.on('did-error', callback)

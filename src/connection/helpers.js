@@ -52,22 +52,23 @@ export function guessFileName(visitedUrls: Array<string>, headers: Object): ?str
   return null
 }
 
-export function getTransform(connection: Connection, response: Object, tickCallback: (() => void)): Object {
+export function getTransform(connection: Connection, response: Object): Object {
   const transform = new Transform()
   // $FlowIgnore: Some type merge issues with flow
   transform._transform = (givenChunk, encoding, callback) => { // eslint-disable-line no-underscore-dangle
-    if (!connection.status) {
-      response.destroy()
-    } else {
-      const remaining = connection.worker.getRemaining()
-      let chunk = givenChunk
-      if (chunk.length > remaining) {
-        chunk = chunk.slice(0, remaining)
-      }
-      connection.worker.advance(chunk.length)
-      tickCallback()
-      callback(null, chunk)
+    if (connection.subscriptions.disposed) {
+      callback(null, null)
+      return
     }
+    const remaining = connection.worker.getRemaining()
+    let chunk = givenChunk
+    if (chunk.length > remaining) {
+      chunk = chunk.slice(0, remaining)
+    }
+    if (chunk.length) {
+      connection.worker.advance(chunk.length)
+    }
+    callback(null, chunk)
   }
   return transform
 }
