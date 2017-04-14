@@ -1,22 +1,16 @@
 #!/usr/bin/env node
-'use strict'
 
 const ms = require('ms')
+const ora = require('ora')
 const Path = require('path')
-const chalk = require('chalk')
+const bytes = require('bytes')
 const minimist = require('minimist')
-const manifest = require('../package')
-const fileSize = require('filesize')
-const ProgressBar = require('progress')
-const Downloader = require('../')
-const parameters = minimist(process.argv.slice(2))
+const manifest = require('../package.json')
 
-process.on('uncaughtException', function(error) {
-  console.error((error && error.stack) || error)
-})
-process.on('unhandledRejection', function(reason, promise) {
-  console.error('Unhandled Rejection at: Promise ', promise, ' reason: ', reason)
-})
+require('process-bootstrap')('downloader')
+
+const parameters = minimist(process.argv.slice(2))
+const Downloader = require('../')
 
 if (parameters.v) {
   console.log('sb-downloader: version', manifest.version)
@@ -28,7 +22,8 @@ if (parameters.v) {
   const headers = {}
   const filePath = parameters._[1] || null
   const maxConnections = parseInt(parameters['max-connections'], 10) || 4
-  let downloadInfo = {}
+  const spinner = ora('Downloading').start()
+  let connection
 
   rawHeaders.forEach(function(header) {
     const index = header.indexOf(':')
@@ -48,32 +43,32 @@ if (parameters.v) {
   download.onDidError(function(error) {
     console.error('Download Error', (error && error.stack) || error)
   })
-  download.onDidStart(function(info) {
-    downloadInfo = info
+  download.onDidEstablishConnection(function(_connection) {
+    if (!connection) connection = _connection
   })
-
-  let progress = null
-  let lastCompleted = 0
   download.onDidProgress(function() {
-    if (!downloadInfo.filePath) {
+    if (!connection) {
       return
     }
-    if (!progress) {
-      progress = new ProgressBar(`  Downloading ${Path.basename(downloadInfo.filePath)} [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
-        complete: '=',
-        incomplete: '_',
-        width: 50,
-        total: Math.ceil(download.pool.length / 1024),
-      })
-    }
-    const newCompleted = Math.round(download.pool.getCompleted() / 1024)
-    progress.tick(newCompleted - lastCompleted)
-    lastCompleted = newCompleted
+    spinner.text = `Downloading: ${Path.basename(download.filePath)} (${bytes(download.pool.getCompleted())} / ${bytes(download.pool.length)})`
   })
   download.onDidComplete(function() {
     const timeTaken = process.uptime()
-    const bytesPerSecond = Math.round(downloadInfo.fileSize / timeTaken)
-    console.log(`\n  File saved to ${chalk.green(downloadInfo.filePath)} in ${ms(timeTaken * 1000)} (${fileSize(bytesPerSecond)}/s)`)
+    const bytesPerSecond = connection.fileSize === Infinity ? '' : `(${bytes(Math.round(connection.fileSize / timeTaken))}/s)`
+    spinner.stop()
+    console.log(`\n  File saved to ${download.filePath} in ${ms(timeTaken * 1000)} ${bytesPerSecond}`)
   })
-  download.start().catch(e => console.error(e.stack || e))
+  download.activate().catch(e => console.error(e.stack || e))
+
+  let downloadIsAlive = true
+  const killDownload = function() {
+    if (downloadIsAlive) {
+      downloadIsAlive = false
+      download.dispose()
+    }
+    process.exit()
+  }
+
+  process.on('SIGINT', killDownload)
+  process.on('exit', killDownload)
 }

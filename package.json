@@ -7,15 +7,17 @@
     "download": "./cli/download.js"
   },
   "dependencies": {
-    "chalk": "^1.1.3",
-    "filesize": "^3.3.0",
-    "got": "^6.5.0",
+    "bytes": "^2.5.0",
+    "got": "^6.7.1",
+    "lodash.clonedeep": "^4.5.0",
     "minimist": "^1.2.0",
     "ms": "^1.0.0",
-    "progress": "^2.0.0",
+    "ora": "^1.2.0",
+    "process-bootstrap": "^1.0.0",
     "range-pool": "^3.1.0",
+    "sb-config-file": "^3.0.2",
     "sb-event-kit": "^3.0.0",
-    "sb-promisify": "^2.0.1"
+    "sb-fs": "^3.0.0"
   },
   "devDependencies": {
     "babel-cli": "^6.11.4",
