@@ -6,6 +6,6 @@ export type DownloadConfig = {
     file?: string,
     directory: string,
   },
-  headers?: Object,
-  connections?: number
+  headers: Object,
+  connections: number
 }

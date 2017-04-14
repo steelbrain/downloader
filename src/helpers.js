@@ -33,3 +33,7 @@ export function fillOptions(given: Object): DownloadConfig {
   return { url, output, headers, connections }
 }
 /* eslint-enable prefer-const */
+
+export function getRandomString(): string {
+  return Math.random().toString(36).substr(2, 10)
+}
