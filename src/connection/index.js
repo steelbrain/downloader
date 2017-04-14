@@ -71,7 +71,9 @@ export default class Connection {
     chain = chain.pipe(FS.createWriteStream(this.filePath, {
       flags: 'a',
     }))
-    chain.on('error', (error) => {
+    chain.on('close', () => {
+      this.emitter.emit('did-complete')
+    }).on('error', (error) => {
       this.emitter.emit('did-error', error)
     })
     this.emitter.emit('did-connect')
@@ -79,8 +81,8 @@ export default class Connection {
   }
   async rename(filePath: string): Promise<void> {
     const oldFilePath = this.filePath
-    this.filePath = filePath
-    await FS.rename(oldFilePath, `${filePath}.part-${this.worker.getMetadata().id}`)
+    this.filePath = `${filePath}.part-${this.worker.getMetadata().id}`
+    await FS.rename(oldFilePath, this.filePath)
   }
   onDidError(callback: ((error: Error) => any)): Disposable {
     return this.emitter.on('did-error', callback)
@@ -90,6 +92,9 @@ export default class Connection {
   }
   onDidProgress(callback: (() => any)): Disposable {
     return this.emitter.on('did-progress', callback)
+  }
+  onDidComplete(callback: (() => any)): Disposable {
+    return this.emitter.on('did-complete', callback)
   }
   dispose() {
     this.subscriptions.dispose()

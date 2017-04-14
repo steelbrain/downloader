@@ -2,6 +2,7 @@
 
 import invariant from 'assert'
 import cloneDeep from 'lodash.clonedeep'
+import { RangePool } from 'range-pool'
 import type { DownloadConfig } from './types'
 
 /* eslint-disable prefer-const */
@@ -36,4 +37,25 @@ export function fillOptions(given: Object): DownloadConfig {
 
 export function getRandomString(): string {
   return Math.random().toString(36).substr(2, 10)
+}
+
+export function getLaziestWorker(pool: Object): ?Object {
+  let lazyWorker = null
+  for (const worker of pool.workers) {
+    if (!worker.getStatus()) {
+      continue
+    }
+    if (!lazyWorker || lazyWorker.getRemaining() < worker.getRemaining()) {
+      lazyWorker = worker
+    }
+  }
+  return lazyWorker
+}
+
+export function getRangePool(length: number): Object {
+  const pool = new RangePool(length)
+  pool.setMetadata({
+    lastChunkId: 0,
+  })
+  return pool
 }
