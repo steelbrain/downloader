@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 const ms = require('ms')
+const ora = require('ora')
+const Path = require('path')
 const bytes = require('bytes')
 const minimist = require('minimist')
 const manifest = require('../package.json')
@@ -20,7 +22,8 @@ if (parameters.v) {
   const headers = {}
   const filePath = parameters._[1] || null
   const maxConnections = parseInt(parameters['max-connections'], 10) || 4
-  let downloadInfo = {}
+  const spinner = ora('Downloading').start()
+  let connection
 
   rawHeaders.forEach(function(header) {
     const index = header.indexOf(':')
@@ -40,20 +43,32 @@ if (parameters.v) {
   download.onDidError(function(error) {
     console.error('Download Error', (error && error.stack) || error)
   })
-  download.onDidStart(function(info) {
-    downloadInfo = info
+  download.onDidEstablishConnection(function(_connection) {
+    if (!connection) connection = _connection
   })
-
   download.onDidProgress(function() {
-    if (!downloadInfo.filePath) {
+    if (!connection) {
       return
     }
-    process.stdout.write(`\rDownloaded: ${download.pool.getCompleted()} out of ${download.pool.length}`)
+    spinner.text = `Downloading: ${Path.basename(download.filePath)} (${bytes(download.pool.getCompleted())} / ${bytes(download.pool.length)})`
   })
   download.onDidComplete(function() {
     const timeTaken = process.uptime()
-    const bytesPerSecond = Math.round(downloadInfo.fileSize / timeTaken)
-    console.log(`\n  File saved to ${downloadInfo.filePath} in ${ms(timeTaken * 1000)} (${bytes(bytesPerSecond)}/s)`)
+    const bytesPerSecond = connection.fileSize === Infinity ? '' : `(${bytes(Math.round(connection.fileSize / timeTaken))}/s)`
+    spinner.stop()
+    console.log(`\n  File saved to ${download.filePath} in ${ms(timeTaken * 1000)} ${bytesPerSecond}`)
   })
-  download.start().catch(e => console.error(e.stack || e))
+  download.activate().catch(e => console.error(e.stack || e))
+
+  let downloadIsAlive = true
+  const killDownload = function() {
+    if (downloadIsAlive) {
+      downloadIsAlive = false
+      download.dispose()
+    }
+    process.exit()
+  }
+
+  process.on('SIGINT', killDownload)
+  process.on('exit', killDownload)
 }
