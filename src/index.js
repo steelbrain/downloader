@@ -46,7 +46,7 @@ class Download {
     this.onDidComplete(() => {
       // Sort for pop so first id is at the end of array
       const files = Array.from(this.connections).sort(function(a, b) {
-        return b.worker.getMetadata().id - a.worker.getMetadata().id
+        return b.worker.startIndex - a.worker.startIndex
       }).map(entry => entry.filePath)
       async function mergeNextFile() {
         const entry = files.pop()
