@@ -7,9 +7,12 @@
     "download": "./cli/download.js"
   },
   "dependencies": {
+    "bytes": "^2.5.0",
     "got": "^6.5.0",
     "minimist": "^1.2.0",
-    "range-pool": "^3.1.0",
+    "ms": "^1.0.0",
+    "process-bootstrap": "^1.0.0",
+    "range-pool": "^3.0.0",
     "sb-event-kit": "^3.0.0",
     "sb-fs": "^3.0.0"
   },

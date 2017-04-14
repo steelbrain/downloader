@@ -1,22 +1,14 @@
 #!/usr/bin/env node
-'use strict'
 
 const ms = require('ms')
-const Path = require('path')
-const chalk = require('chalk')
+const bytes = require('bytes')
 const minimist = require('minimist')
-const manifest = require('../package')
-const fileSize = require('filesize')
-const ProgressBar = require('progress')
-const Downloader = require('../')
-const parameters = minimist(process.argv.slice(2))
+const manifest = require('../package.json')
 
-process.on('uncaughtException', function(error) {
-  console.error((error && error.stack) || error)
-})
-process.on('unhandledRejection', function(reason, promise) {
-  console.error('Unhandled Rejection at: Promise ', promise, ' reason: ', reason)
-})
+require('process-bootstrap')('downloader')
+
+const parameters = minimist(process.argv.slice(2))
+const Downloader = require('../')
 
 if (parameters.v) {
   console.log('sb-downloader: version', manifest.version)
@@ -52,28 +44,16 @@ if (parameters.v) {
     downloadInfo = info
   })
 
-  let progress = null
-  let lastCompleted = 0
   download.onDidProgress(function() {
     if (!downloadInfo.filePath) {
       return
     }
-    if (!progress) {
-      progress = new ProgressBar(`  Downloading ${Path.basename(downloadInfo.filePath)} [:bar] ${chalk.blue(':percent')} ${chalk.yellow(':current KiB/:total KiB')}`, {
-        complete: '=',
-        incomplete: '_',
-        width: 50,
-        total: Math.ceil(download.pool.length / 1024),
-      })
-    }
-    const newCompleted = Math.round(download.pool.getCompleted() / 1024)
-    progress.tick(newCompleted - lastCompleted)
-    lastCompleted = newCompleted
+    process.stdout.write(`\rDownloaded: ${download.pool.getCompleted()} out of ${download.pool.length}`)
   })
   download.onDidComplete(function() {
     const timeTaken = process.uptime()
     const bytesPerSecond = Math.round(downloadInfo.fileSize / timeTaken)
-    console.log(`\n  File saved to ${chalk.green(downloadInfo.filePath)} in ${ms(timeTaken * 1000)} (${fileSize(bytesPerSecond)}/s)`)
+    console.log(`\n  File saved to ${downloadInfo.filePath} in ${ms(timeTaken * 1000)} (${bytes(bytesPerSecond)}/s)`)
   })
   download.start().catch(e => console.error(e.stack || e))
 }
