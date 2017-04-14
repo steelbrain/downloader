@@ -65,6 +65,7 @@ class Download {
         await mergeNextFile()
       }
       if (!await FS.exists(filePath) || await FS.exists(files[0])) {
+        await FS.unlink(filePath)
         await mergeNextFile()
       }
       if (await FS.exists(`${filePath}.manifest`)) {
@@ -122,12 +123,16 @@ class Download {
 
     const poolWorker = this.pool.getWorker()
     const poolMetadata = this.pool.getMetadata()
-    const poolWorkerId = ++poolMetadata.lastChunkId
+    const workerMetadata = poolWorker.getMetadata()
 
-    poolWorker.setMetadata({ id: poolWorkerId })
-    this.pool.setMetadata(poolMetadata)
+    if (typeof workerMetadata.id === 'undefined') {
+      const poolWorkerId = ++poolMetadata.lastChunkId
+      workerMetadata.id = poolWorkerId
+      poolWorker.setMetadata(workerMetadata)
+      this.pool.setMetadata(poolMetadata)
+    }
 
-    const connection = new Connection(poolWorker, this.options, `${this.filePath}.part-${poolWorkerId}`)
+    const connection = new Connection(poolWorker, this.options, `${this.filePath}.part-${workerMetadata.id}`)
     const errorCallback = (error) => {
       this.emitter.emit('did-error', error)
       if (!connection.worker.hasCompleted()) {

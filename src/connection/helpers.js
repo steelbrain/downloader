@@ -52,7 +52,7 @@ export function guessFileName(visitedUrls: Array<string>, headers: Object): ?str
   return null
 }
 
-export function getTransform(connection: Connection, response: Object): Object {
+export function getTransform(connection: Connection): Object {
   const transform = new Transform()
   // $FlowIgnore: Some type merge issues with flow
   transform._transform = (givenChunk, encoding, callback) => { // eslint-disable-line no-underscore-dangle

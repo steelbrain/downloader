@@ -67,7 +67,7 @@ export default class Connection {
       this.emitter.emit('did-progress')
     })
     chain = chain.pipe(FS.createWriteStream(this.filePath, {
-      flags: 'a',
+      flags: this.worker.startIndex === this.worker.currentIndex ? 'w+' : 'a',
     }))
     chain.on('close', async () => {
       this.complete = true
