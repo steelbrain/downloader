@@ -12,8 +12,6 @@ import Connection from './connection'
 import * as Helpers from './helpers'
 import type { DownloadConfig } from './types'
 
-const DEFAULT_POOL_METADATA = { lastChunkId: 0 }
-
 class Download {
   pool: RangePool;
   emitter: Emitter;
@@ -79,6 +77,29 @@ class Download {
       setImmediate(() => this.dispose())
       throw error
     }
+    this.onDidComplete(() => {
+      // Sort for pop so first id is at the end of array
+      const files = Array.from(this.connections).sort(function(a, b) {
+        return b.worker.getMetadata().id - a.worker.getMetadata().id
+      }).map(entry => entry.filePath)
+      async function mergeNextFile() {
+        const entry = files.pop()
+        if (!entry) {
+          return
+        }
+        await new Promise(function(resolve, reject) {
+          FS.createReadStream(entry)
+            .pipe(FS.createWriteStream(filename))
+            .on('error', reject)
+            .on('close', resolve)
+        })
+        await FS.unlink(entry)
+        await mergeNextFile()
+      }
+      mergeNextFile()
+        .then(() => this.configFile && FS.unlink(this.configFile.filePath))
+        .catch(e => this.emitter.emit('did-error', e))
+    })
   }
   getConnection(filePath: string): ?Connection {
     if (this.pool.hasCompleted()) {
@@ -138,7 +159,10 @@ class Download {
     return this.emitter.on('did-complete', callback)
   }
   dispose() {
-    // TODO: Save state here
+    this.connections.forEach(c => c.abort())
+    if (this.configFile) {
+      this.configFile.setSync('serialized', this.pool.serialize())
+    }
     this.subscriptions.dispose()
   }
 }
