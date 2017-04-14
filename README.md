@@ -26,10 +26,10 @@ type Downloader$Job = {
 }
 export function download(options: Downloader$Job): Download
 export class Download {
-  start(): Promise
+  activate(): Promise
   onDidError(callback: Function)
   onDidProgress(callback: Function)
-  onDidStart(callback: Function)
+  onDidEstablishConnection(callback: Function)
   onDidComplete(callback: Function)
   dispose()
 }

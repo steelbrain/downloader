@@ -1,3 +1,9 @@
+## 3.0.0
+
+- Full internal rewrite
+- Wildly changed API
+- Bugfix for compressed content encodings
+
 ## 2.1.1
 
 - Fix a bug introduced in 2.0.7 where some files would not be downloaded properly
