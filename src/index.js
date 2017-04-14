@@ -16,12 +16,14 @@ class Download {
   pool: RangePool;
   emitter: Emitter;
   options: DownloadConfig;
+  filePath: string;
   configFile: ConfigFile;
   connections: Set<Connection>
   subscriptions: CompositeDisposable;
   constructor(options: DownloadConfig) {
     this.pool = Helpers.getRangePool(Infinity, 0)
     this.emitter = new Emitter()
+    this.filePath = ''
     this.options = Helpers.fillOptions(options)
     this.configFile = null
     this.connections = new Set()
@@ -31,10 +33,9 @@ class Download {
   }
   async activate(): Promise<void> {
     const filenameIsTemporary = !this.options.output.file
-    let filename = filenameIsTemporary ? Path.join(this.options.output.directory, `download-${Helpers.getRandomString()}`) : this.options.output.file
-    invariant(filename)
+    this.filePath = this.options.output.file ? this.options.output.file : Path.join(this.options.output.directory, `download-${Helpers.getRandomString()}`)
 
-    const firstConnection = this.getConnection(filename)
+    const firstConnection = this.getConnection()
     invariant(firstConnection)
     try {
       await firstConnection.activate()
@@ -43,11 +44,12 @@ class Download {
       throw error
     }
 
-    this.onDidComplete(() => {
+    this.onDidComplete(async () => {
+      const filePath = this.filePath
       // Sort for pop so first id is at the end of array
-      const files = Array.from(this.connections).sort(function(a, b) {
-        return b.worker.startIndex - a.worker.startIndex
-      }).map(entry => entry.filePath)
+      const files = Array.from(this.pool.workers).sort(function(a, b) {
+        return b.startIndex - a.startIndex
+      }).map(worker => `${filePath}.part-${worker.getMetadata().id}`)
       async function mergeNextFile() {
         const entry = files.pop()
         if (!entry) {
@@ -55,20 +57,23 @@ class Download {
         }
         await new Promise(function(resolve, reject) {
           FS.createReadStream(entry)
-            .pipe(FS.createWriteStream(filename, { flags: 'a' }))
+            .pipe(FS.createWriteStream(filePath, { flags: 'a' }))
             .on('error', reject)
             .on('close', resolve)
         })
         await FS.unlink(entry)
         await mergeNextFile()
       }
-      mergeNextFile()
-        .then(() => this.configFile && FS.unlink(this.configFile.filePath))
-        .catch(e => this.emitter.emit('did-error', e))
+      if (!await FS.exists(filePath) || await FS.exists(files[0])) {
+        await mergeNextFile()
+      }
+      if (await FS.exists(`${filePath}.manifest`)) {
+        await FS.unlink(`${filePath}.manifest`)
+      }
     })
 
     if (filenameIsTemporary && firstConnection.fileName) {
-      filename = Path.resolve(this.options.output.directory, firstConnection.fileName)
+      this.filePath = Path.resolve(this.options.output.directory, firstConnection.fileName)
     }
 
     if (!firstConnection.supportsResume) {
@@ -82,13 +87,19 @@ class Download {
     this.connections.delete(firstConnection)
     firstConnection.dispose()
     await FS.unlink(firstConnection.filePath)
-    const configFile = await ConfigFile.get(`${filename}.manifest`, { serialized: Helpers.getRangePool(firstConnection.fileSize, 1).serialize() })
+    const configFile = await ConfigFile.get(`${this.filePath}.manifest`, { serialized: Helpers.getRangePool(firstConnection.fileSize, 1).serialize() })
     this.configFile = configFile
     this.pool = RangePool.unserialize(await configFile.get('serialized'))
+    if (this.pool.hasCompleted()) {
+      setImmediate(() => {
+        this.emitter.emit('did-complete')
+      })
+      return
+    }
 
     const promises = []
     for (let i = 0; i < this.options.connections; i++) {
-      const connection = this.getConnection(filename)
+      const connection = this.getConnection()
       if (connection) {
         promises.push(connection.activate())
       }
@@ -100,7 +111,7 @@ class Download {
       throw error
     }
   }
-  getConnection(filePath: string): ?Connection {
+  getConnection(): ?Connection {
     if (this.pool.hasCompleted()) {
       return null
     }
@@ -116,7 +127,7 @@ class Download {
     poolWorker.setMetadata({ id: poolWorkerId })
     this.pool.setMetadata(poolMetadata)
 
-    const connection = new Connection(poolWorker, this.options, `${filePath}.part-${poolWorkerId}`)
+    const connection = new Connection(poolWorker, this.options, `${this.filePath}.part-${poolWorkerId}`)
     const errorCallback = (error) => {
       this.emitter.emit('did-error', error)
       if (!connection.worker.hasCompleted()) {
@@ -130,14 +141,18 @@ class Download {
     connection.onDidConnect(() => {
       this.emitter.emit('did-establish-connection', connection)
     })
-    connection.onDidComplete(() => {
+    connection.onDidComplete(async () => {
       const completed = Array.from(this.connections).every(i => i.complete)
       if (this.pool.length === Infinity || completed) {
-        this.emitter.emit('did-complete')
+        try {
+          await this.emitter.emit('did-complete')
+        } catch (error) {
+          this.emitter.emit('did-error', error)
+        }
         this.dispose()
         return
       }
-      const newConnection = this.getConnection(filePath)
+      const newConnection = this.getConnection(this.filePath)
       if (newConnection) {
         newConnection.activate().catch(errorCallback)
       }
@@ -160,7 +175,7 @@ class Download {
   }
   dispose() {
     this.connections.forEach(c => c.dispose())
-    if (this.configFile) {
+    if (this.configFile && !this.pool.hasCompleted()) {
       this.configFile.setSync('serialized', this.pool.serialize())
     }
     this.subscriptions.dispose()

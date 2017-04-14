@@ -63,18 +63,18 @@ export default class Connection {
     } else if (this.contentEncoding === 'gzip') {
       chain = chain.pipe(createGunzip())
     }
+    chain.on('data', () => {
+      this.emitter.emit('did-progress')
+    })
     chain = chain.pipe(FS.createWriteStream(this.filePath, {
       flags: 'a',
     }))
     chain.on('close', async () => {
-      console.log('connection complete', this.worker.getMetadata().id)
       this.complete = true
       this.emitter.emit('did-complete')
     }).on('error', (error) => {
       console.log('error', error)
       this.emitter.emit('did-error', error)
-    }).on('data', () => {
-      this.emitter.emit('did-progress')
     })
     this.emitter.emit('did-connect')
     this.subscriptions.add(function() {
