@@ -61,8 +61,7 @@ export default class Connection {
     this.fileName = Helpers.guessFileName(this.visitedUrls.slice(), response.headers)
 
     let chain = request.pipe(Helpers.getTransform(this, response, () => {
-      // TODO: Events
-      process.stdout.write(`\rtick callback: ${this.worker.getCompletionPercentage()}`)
+      this.emitter.emit('did-progress')
     }))
     if (this.contentEncoding === 'deflate') {
       chain = chain.pipe(createInflate())
@@ -75,6 +74,7 @@ export default class Connection {
     chain.on('error', (error) => {
       this.emitter.emit('did-error', error)
     })
+    this.emitter.emit('did-connect')
     response.resume()
   }
   async rename(filePath: string): Promise<void> {
@@ -84,6 +84,12 @@ export default class Connection {
   }
   onDidError(callback: ((error: Error) => any)): Disposable {
     return this.emitter.on('did-error', callback)
+  }
+  onDidConnect(callback: (() => any)): Disposable {
+    return this.emitter.on('did-connect', callback)
+  }
+  onDidProgress(callback: (() => any)): Disposable {
+    return this.emitter.on('did-progress', callback)
   }
   dispose() {
     this.subscriptions.dispose()

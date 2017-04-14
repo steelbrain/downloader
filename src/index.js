@@ -56,6 +56,14 @@ class Download {
     const connection = new Connection(poolWorker, this.options, `${filePath}.part-${poolWorkerId}`)
     connection.onDidError((error) => {
       this.emitter.emit('did-error', error)
+      connection.abort()
+      connection.dispose()
+    })
+    connection.onDidProgress(() => {
+      this.emitter.emit('did-progress', connection)
+    })
+    connection.onDidConnect(() => {
+      this.emitter.emit('did-establish-connection', connection)
     })
     this.connections.add(connection)
 
@@ -63,6 +71,12 @@ class Download {
   }
   onDidError(callback: ((error: Error) => any)): Disposable {
     return this.emitter.on('did-error', callback)
+  }
+  onDidProgress(callback: ((connection: Connection) => any)): Disposable {
+    return this.emitter.on('did-progress', callback)
+  }
+  onDidEstablishConnection(callback: ((connection: Connection) => any)): Disposable {
+    return this.emitter.on('did-establish-connection', callback)
   }
   dispose() {
     // TODO: Save state here
