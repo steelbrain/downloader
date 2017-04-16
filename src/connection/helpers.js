@@ -1,22 +1,22 @@
 /* @flow */
 
-import got from 'got'
+import request from 'request'
 import { Transform } from 'stream'
 import { posix as Path } from 'path'
 import type Connection from './'
 
 export function openConnection(url: string, options: Object): Promise<Object> {
   return new Promise(function(resolve, reject) {
-    const request = got.stream(url, options)
+    const req = request(url, options)
     const visitedUrls = [url]
-    request.on('error', reject)
-    request.on('redirect', function(response) {
+    req.on('error', reject)
+    req.on('redirect', function(response) {
       visitedUrls.push(response.headers.location)
     })
-    request.on('response', function(response) {
-      resolve({ request, response, visitedUrls })
+    req.on('response', function(response) {
+      resolve({ request: req, response, visitedUrls })
     })
-    request.pause()
+    req.pause()
   })
 }
 

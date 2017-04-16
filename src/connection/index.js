@@ -1,7 +1,7 @@
 /* @flow */
 
 import FS from 'sb-fs'
-import { createInflate, createGunzip } from 'zlib'
+import { createUnzip } from 'zlib'
 import { CompositeDisposable, Emitter } from 'sb-event-kit'
 import type { Disposable } from 'sb-event-kit'
 
@@ -57,11 +57,9 @@ export default class Connection {
     }
     this.fileName = Helpers.guessFileName(this.visitedUrls.slice(), response.headers)
 
-    let chain = request.pipe(Helpers.getTransform(this, response))
-    if (this.contentEncoding === 'deflate') {
-      chain = chain.pipe(createInflate())
-    } else if (this.contentEncoding === 'gzip') {
-      chain = chain.pipe(createGunzip())
+    let chain = request.pipe(Helpers.getTransform(this, request))
+    if (this.contentEncoding === 'deflate' || this.contentEncoding === 'gzip') {
+      chain = chain.pipe(createUnzip())
     }
     chain.on('data', () => {
       this.emitter.emit('did-progress')

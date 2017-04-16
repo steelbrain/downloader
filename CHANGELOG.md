@@ -1,3 +1,7 @@
+## 3.0.1
+
+- Use `request` instead of `got` because got doesn't return real http bytes, only ungzipped ones
+
 ## 3.0.0
 
 - Full internal rewrite
