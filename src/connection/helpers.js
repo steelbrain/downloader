@@ -8,13 +8,15 @@ import type Connection from './'
 export function openConnection(url: string, options: Object): Promise<Object> {
   return new Promise(function(resolve, reject) {
     const req = request(url, options)
-    const visitedUrls = [url]
     req.on('error', reject)
-    req.on('redirect', function(response) {
-      visitedUrls.push(response.headers.location)
-    })
     req.on('response', function(response) {
-      resolve({ request: req, response, visitedUrls })
+      // eslint-disable-next-line no-underscore-dangle
+      const visitedUrls = [url].concat(req._redirect.redirects.map(i => i.redirectUri))
+      resolve({
+        request: req,
+        response,
+        visitedUrls,
+      })
     })
     req.pause()
   })

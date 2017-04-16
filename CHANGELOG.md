@@ -1,3 +1,7 @@
+## 3.0.2
+
+- Fix visited urls with `request` structure
+
 ## 3.0.1
 
 - Use `request` instead of `got` because got doesn't return real http bytes, only ungzipped ones
