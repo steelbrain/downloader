@@ -20,7 +20,7 @@
     "sb-fs": "^3.0.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.11.4",
+    "babel-cli": "^6.24.1",
     "babel-preset-steelbrain": "^5.0.0",
     "eslint-config-steelbrain": "^3.0.1",
     "flow-bin": "^0.44.0"
